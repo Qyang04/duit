@@ -5,6 +5,10 @@ name: ci
 on:
   push:
     branches: [main]
+    paths-ignore: # manifests and docs do not change the image
+      - "deploy/**"
+      - "docs/**"
+      - "**.md"
   pull_request:
 
 permissions:

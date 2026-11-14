@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, LargeBinary, MetaData, Text
+from sqlalchemy import URL, DateTime, LargeBinary, MetaData, Text, make_url
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -28,8 +28,16 @@ class Base(DeclarativeBase):
     }
 
 
+def async_url(raw: str) -> URL:
+    """Accept plain postgresql:// URLs (CloudNativePG's `uri` secret key) and use asyncpg."""
+    url = make_url(raw)
+    if url.drivername in ("postgresql", "postgres"):
+        url = url.set(drivername="postgresql+asyncpg")
+    return url
+
+
 def create_engine(settings: Settings) -> AsyncEngine:
     return create_async_engine(
-        settings.database_url.get_secret_value(),
+        async_url(settings.database_url.get_secret_value()),
         pool_pre_ping=True,  # drop dead connections after a Postgres restart or failover
     )

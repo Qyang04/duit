@@ -11,7 +11,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="DUIT_", env_file=".env")
 
     environment: Literal["dev", "staging", "prod"] = "dev"
-    # postgresql+asyncpg://user:password@host:5432/db. SecretStr: never printed in logs or reprs.
+    # postgresql://user:password@host:5432/db (+asyncpg is added if missing).
+    # SecretStr: never printed in logs or reprs.
     database_url: SecretStr
 
 
