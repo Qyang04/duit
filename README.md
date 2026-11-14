@@ -30,6 +30,18 @@ Checks (CI runs the same):
 uv run ruff check . ; uv run ruff format --check . ; uv run pyright ; uv run deptry . ; uv run alembic check ; uv run pytest
 ```
 
+## Deploy
+
+`deploy/` is Kustomize: `base/` (CNPG Postgres, migrate Job, API) plus one overlay per environment.
+Argo CD (configured in [homelab](https://github.com/Qyang04/homelab), `clusters/prod/apps/duit-staging.yaml`)
+syncs `deploy/overlays/staging` to https://duit-staging.luiqiuyang.com in sync waves:
+
+1. Postgres (`Cluster duit-db`), wait until healthy. CNPG writes credentials to Secret `duit-db-app`.
+2. `duit-migrate` Job: `alembic upgrade head`. If it fails, the sync stops and the old API keeps serving.
+3. API Deployment, Service, Ingress.
+
+To deploy a new image, set `images[].newTag` in the overlay to the `sha-<commit>` tag CI pushed.
+
 ## Settings
 
 Environment variables prefixed `DUIT_` (see `backend/duit/core/settings.py`).
