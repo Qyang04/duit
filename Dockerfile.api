@@ -10,6 +10,9 @@ WORKDIR /app
 COPY backend/pyproject.toml backend/uv.lock ./
 RUN uv sync --locked --no-dev --no-install-project
 COPY backend/duit ./duit
+# Migrations ship in the same image: the cluster runs `alembic upgrade head` from it before a rollout.
+COPY backend/alembic.ini ./
+COPY backend/migrations ./migrations
 
 FROM python:3.13-slim AS runtime
 # Fixed non-root UID so Kubernetes can enforce runAsNonRoot / Pod Security "restricted".
@@ -17,6 +20,8 @@ RUN useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin duit
 WORKDIR /app
 COPY --from=builder /app/.venv ./.venv
 COPY --from=builder /app/duit ./duit
+COPY --from=builder /app/alembic.ini ./
+COPY --from=builder /app/migrations ./migrations
 ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 USER 10001
 EXPOSE 8000

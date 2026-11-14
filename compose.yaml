@@ -1,0 +1,21 @@
+# Local development only: Postgres 18 for the API and tests.
+# Throwaway credentials, bound to 127.0.0.1; the cluster uses CloudNativePG instead.
+services:
+  postgres:
+    image: postgres:18.6
+    environment:
+      POSTGRES_USER: duit
+      POSTGRES_PASSWORD: duit
+      POSTGRES_DB: duit
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U duit -d duit"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+volumes:
+  pgdata:
