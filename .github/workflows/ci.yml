@@ -1,0 +1,123 @@
+# CI: checks on every push and PR; on main, the scanned image is pushed to GHCR.
+# Actions are pinned to full commit SHAs (tags can be moved); Dependabot proposes updates.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read # least privilege by default; jobs ask for more only if they need it
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE: ghcr.io/qyang04/duit-api # GHCR names must be lowercase
+  TRIVY_VERSION: v0.76.2 # the scanner itself, pinned separately from the action
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres: # same Postgres as compose.yaml and the cluster
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: duit
+          POSTGRES_PASSWORD: duit
+          POSTGRES_DB: duit
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U duit -d duit"
+          --health-interval 2s --health-timeout 3s --health-retries 15
+    env:
+      DUIT_DATABASE_URL: postgresql+asyncpg://duit:duit@127.0.0.1:5432/duit
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          python-version: "3.13"
+          enable-cache: true
+      - name: Install (exactly as locked)
+        run: uv sync --locked
+      - name: Lint
+        run: uv run ruff check .
+      - name: Format
+        run: uv run ruff format --check .
+      - name: Types
+        run: uv run pyright
+      - name: Dependencies
+        run: uv run deptry .
+      - name: Migrate
+        run: uv run alembic upgrade head
+      - name: Models match migrations
+        run: uv run alembic check
+      - name: Tests
+        run: uv run pytest
+
+  image:
+    needs: test
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write # push to GHCR (used only on main)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=sha,prefix=sha-,format=short
+            type=raw,value=main,enable={{is_default_branch}}
+      - name: Build (load locally, not pushed yet)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: Dockerfile.api
+          load: true
+          push: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Scan (fail on fixable HIGH/CRITICAL)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          image-ref: ${{ env.IMAGE }}:${{ steps.meta.outputs.version }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: SBOM (CycloneDX)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          skip-setup-trivy: true
+          image-ref: ${{ env.IMAGE }}:${{ steps.meta.outputs.version }}
+          format: cyclonedx
+          output: sbom.cdx.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sbom-${{ steps.meta.outputs.version }}
+          path: sbom.cdx.json
+      - name: Log in to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Push the exact image that was scanned
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: docker push --all-tags "$IMAGE"
