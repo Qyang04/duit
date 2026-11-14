@@ -1,0 +1,24 @@
+# Postgres via CloudNativePG. The operator creates the `duit` database and owner, and writes
+# the credentials to Secret duit-db-app (keys: username, password, host, uri, ...).
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: duit-db
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  instances: 1
+  # Pinned: a CNPG upgrade must never change the Postgres version on its own.
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.6-minimal-trixie
+  bootstrap:
+    initdb:
+      database: duit
+      owner: duit
+  postgresql:
+    parameters:
+      shared_buffers: 64MB
+  storage:
+    size: 2Gi
+  resources:
+    requests: { cpu: 50m, memory: 256Mi }
+    limits: { memory: 256Mi }

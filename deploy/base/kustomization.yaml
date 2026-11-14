@@ -1,0 +1,11 @@
+# Shared by every environment. Rollout order (Argo CD sync waves):
+#   -1 Postgres (CNPG Cluster, waits until healthy) -> 0 migrate Job -> 1 API + Service (+ Ingress)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: duit
+resources:
+  - postgres.yaml
+  - migrate-job.yaml
+  - api.yaml

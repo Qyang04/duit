@@ -1,0 +1,17 @@
+# Staging: deployed by Argo CD from homelab/clusters/prod/apps/duit-staging.yaml.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: duit-staging
+resources:
+  - ../../base
+  - ingress.yaml
+configMapGenerator: # hash-suffixed name: a config change rolls the pods
+  - name: duit-config
+    literals:
+      - DUIT_ENVIRONMENT=staging
+    options:
+      annotations:
+        argocd.argoproj.io/sync-wave: "-1" # exists before the migrate Job reads it
+images:
+  - name: ghcr.io/qyang04/duit-api
+    newTag: sha-63e94d4 # immutable tag from CI (one per commit)
