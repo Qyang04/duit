@@ -1,0 +1,23 @@
+# Duit API image. Build from the repo root:  docker build -f Dockerfile.api -t duit-api .
+# Multi-stage: uv installs locked deps in "builder"; "runtime" gets only the venv and code.
+
+FROM python:3.13-slim AS builder
+COPY --from=ghcr.io/astral-sh/uv:0.13.8 /uv /bin/uv
+# Compile .pyc at build time (the runtime filesystem is read-only); copy, don't hardlink.
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never
+WORKDIR /app
+# Dependencies first: this layer is cached until pyproject.toml or uv.lock changes.
+COPY backend/pyproject.toml backend/uv.lock ./
+RUN uv sync --locked --no-dev --no-install-project
+COPY backend/duit ./duit
+
+FROM python:3.13-slim AS runtime
+# Fixed non-root UID so Kubernetes can enforce runAsNonRoot / Pod Security "restricted".
+RUN useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin duit
+WORKDIR /app
+COPY --from=builder /app/.venv ./.venv
+COPY --from=builder /app/duit ./duit
+ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
+USER 10001
+EXPOSE 8000
+CMD ["uvicorn", "duit.main_api:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]

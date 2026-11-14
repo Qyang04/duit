@@ -1,0 +1,43 @@
+[project]
+name = "duit"
+version = "0.1.0"
+description = "Duit: personal finance and tax copilot (API + worker)"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.162.7",
+    "pydantic-settings>=2.16.3",
+    "uvicorn>=0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "deptry>=0.25.1",
+    "httpx2>=2.16.0",
+    "pyright>=1.1.414",
+    "pytest>=9.2.0",
+    "ruff>=0.17.5",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+# pycodestyle, pyflakes, isort, bugbear, pyupgrade, simplify, bandit (security)
+select = ["E", "F", "I", "B", "UP", "SIM", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"] # assert is how pytest works
+
+[tool.pyright]
+typeCheckingMode = "strict"
+include = ["duit", "tests"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.deptry]
+known_first_party = ["duit"]
+
+[tool.deptry.per_rule_ignores]
+DEP002 = ["uvicorn"] # the ASGI server: run as a command (Dockerfile), never imported

@@ -1,0 +1,8 @@
+# Only backend sources go into the build context.
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+.git
+web/
+docs/
