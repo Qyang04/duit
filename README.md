@@ -52,8 +52,44 @@ Environment variables prefixed `DUIT_` (see `backend/duit/core/settings.py`).
 |---|---|---|
 | `DUIT_ENVIRONMENT` | `dev` | `dev`, `staging` or `prod`; `/docs` is off in prod |
 | `DUIT_DATABASE_URL` | (required) | `postgresql+asyncpg://user:password@host:5432/db` |
+| `DUIT_DATA_KEY` | (required by the API) | 32 random bytes, base64. AES-GCM key for sensitive columns (TOTP secrets, later bank credentials). Losing it makes those columns unreadable: back it up |
+| `DUIT_REGISTRATION_OPEN` | `false` | When false, only the first account can register (claim the instance right after deploying) |
+
+`.env.example` holds a public dev-only data key; never reuse it outside dev.
+
+## Secrets
+
+Kubernetes Secrets live in Git, encrypted with SOPS + age (`.sops.yaml`, same two keys as
+[homelab](https://github.com/Qyang04/homelab)): the personal key on the owner's PC, and the cluster key
+that KSOPS uses inside Argo CD. Only values (`data`/`stringData`) are encrypted; names stay readable.
+
+- Staging: `deploy/overlays/staging/secrets.enc.yaml` (Secret `duit-app-secrets`, key `data-key`),
+  listed in `secret-generator.yaml`.
+- Edit: `sops deploy/overlays/staging/secrets.enc.yaml` (decrypts in an editor, re-encrypts on save).
+- The Argo CD Application uses `ServerSideApply=true`, so no plaintext copy ends up in a
+  `last-applied-configuration` annotation.
+- The database password is not here: CloudNativePG generates it (Secret `duit-db-app`).
+
+## Auth
+
+| Endpoint | What |
+|---|---|
+| `POST /auth/register` | Create an account (first account only, unless registration is open) |
+| `POST /auth/login` | Email + password (+ `totp_code` once 2FA is on); sets the session cookie |
+| `POST /auth/logout` | Deletes the server-side session |
+| `GET /auth/me` | Current user, 401 if not logged in |
+| `POST /auth/totp/setup`, `/auth/totp/confirm` | Enrol an authenticator app; 2FA is enforced after confirm |
+
+- Passwords: argon2id (19 MiB, 2 passes, 1 lane; OWASP minimum), rehashed on login if parameters change.
+- Sessions: random 256-bit token in a `__Host-duit_session` cookie (HttpOnly, Secure, SameSite=Strict);
+  the database stores only its SHA-256. 14 days absolute, 2 days idle.
+- TOTP: RFC 6238, ±1 step drift, each code usable once; secret encrypted with `DUIT_DATA_KEY`,
+  bound to its user.
+- Login failures return one message and take the same time whether or not the email exists.
 
 ## Health endpoints
+
+Used by Kubernetes and monitoring, not by the app's users.
 
 - `/healthz`: liveness. The process is up; checks nothing else, so a database outage never restarts API pods.
 - `/readyz`: readiness. Returns 503 while Postgres is unreachable, which takes the pod out of the Service.
