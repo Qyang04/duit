@@ -73,11 +73,13 @@ jobs:
       contents: read
       packages: write # push to GHCR (used only on main)
     outputs:
-      tag: ${{ steps.meta.outputs.version }} # sha-<short>, handed to deploy-staging
+      tag: ${{ steps.tag.outputs.tag }} # immutable sha-<short>, handed to deploy-staging
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - id: tag # computed, not meta.version: that returns the mutable `main` tag on main
+        run: echo "tag=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
@@ -142,7 +144,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Point staging at the new image
         run: |
-          sed -i -E "s/^(\s*newTag: )sha-[0-9a-f]+/\1${TAG}/" deploy/overlays/staging/kustomization.yaml
+          sed -i -E "s/^(\s*newTag: )\S+/\1${TAG}/" deploy/overlays/staging/kustomization.yaml
+          case "$TAG" in sha-*) ;; *) echo "refusing non-immutable tag $TAG"; exit 1;; esac
           grep -q "newTag: ${TAG}" deploy/overlays/staging/kustomization.yaml # fail loudly if sed missed
           git diff --stat
       - name: Commit and push
