@@ -40,7 +40,9 @@ syncs `deploy/overlays/staging` to https://duit-staging.luiqiuyang.com in sync w
 2. `duit-migrate` Job: `alembic upgrade head`. If it fails, the sync stops and the old API keeps serving.
 3. API Deployment, Service, Ingress.
 
-To deploy a new image, set `images[].newTag` in the overlay to the `sha-<commit>` tag CI pushed.
+Every push to `main` that changes the image deploys itself: after the scanned image is pushed, the
+`deploy-staging` CI job writes its `sha-<commit>` tag into `images[].newTag` and commits it; Argo CD rolls it out.
+Rollback = revert that commit.
 
 ## Settings
 
