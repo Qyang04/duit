@@ -5,6 +5,8 @@ namespace: duit-staging
 resources:
   - ../../base
   - ingress.yaml
+generators:
+  - secret-generator.yaml # Secret duit-app-secrets (DUIT_DATA_KEY), SOPS-encrypted in Git
 configMapGenerator: # hash-suffixed name: a config change rolls the pods
   - name: duit-config
     literals:

@@ -1,4 +1,4 @@
-"""Users and server-side sessions. Login, password hashing and TOTP arrive with the auth step."""
+"""Users and server-side sessions."""
 
 import uuid
 from datetime import datetime
@@ -18,9 +18,18 @@ class User(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, server_default=text("uuidv7()"))
     email: Mapped[str] = mapped_column(unique=True)
-    password_hash: Mapped[str]  # argon2id
-    totp_secret_enc: Mapped[bytes | None]  # encrypted at the app level; NULL until 2FA is set up
+    password_hash: Mapped[str]  # argon2id, parameters embedded in the string
+    # TOTP secret, AES-GCM encrypted with the app's data key (duit.core.crypto).
+    # Set by /auth/totp/setup; 2FA is only enforced once confirmed with a valid code.
+    totp_secret_enc: Mapped[bytes | None]
+    totp_confirmed_at: Mapped[datetime | None]
+    # Last accepted 30-second time step: a code cannot be replayed within its validity window.
+    totp_last_step: Mapped[int | None]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    @property
+    def totp_enabled(self) -> bool:
+        return self.totp_confirmed_at is not None
 
 
 class UserSession(Base):

@@ -6,7 +6,7 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy.engine import Connection
 
-import duit.core.auth  # noqa: F401  (registers the tables on Base.metadata)
+import duit.auth.models  # noqa: F401  (registers the tables on Base.metadata)
 from duit.core.db import Base, create_engine
 from duit.core.settings import get_settings
 

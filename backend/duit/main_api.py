@@ -5,8 +5,10 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response, status
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
+from duit.auth.router import router as auth_router
+from duit.core.crypto import load_data_key
 from duit.core.db import create_engine
 from duit.core.settings import get_settings
 
@@ -15,8 +17,11 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+    load_data_key(settings)  # fail fast: a pod without its data key never becomes ready
     # One connection pool per process, opened at startup and closed at shutdown.
     app.state.engine = create_engine(settings)
+    # expire_on_commit=False: objects stay readable after commit (responses are built from them).
+    app.state.sessionmaker = async_sessionmaker(app.state.engine, expire_on_commit=False)
     yield
     await app.state.engine.dispose()
 
@@ -28,6 +33,7 @@ app = FastAPI(
     docs_url=None if settings.environment == "prod" else "/docs",
     redoc_url=None,
 )
+app.include_router(auth_router)
 
 
 @app.get("/healthz", tags=["ops"])

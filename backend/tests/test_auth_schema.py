@@ -7,7 +7,7 @@ from sqlalchemy import delete, func, insert, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncConnection
 
-from duit.core.auth import User, UserSession
+from duit.auth.models import User, UserSession
 
 pytestmark = pytest.mark.anyio
 

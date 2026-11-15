@@ -1,0 +1,159 @@
+"""/auth endpoints: register, login (+ TOTP), logout, me, TOTP setup and confirmation."""
+
+import uuid
+from datetime import UTC, datetime
+from typing import Annotated
+
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
+from pydantic import BaseModel, EmailStr, Field
+from sqlalchemy import exists, select, text
+
+from duit.auth import passwords, sessions, totp
+from duit.auth.models import User
+from duit.core.crypto import decrypt, encrypt, load_data_key
+from duit.core.deps import AppSettings, Db
+
+router = APIRouter(prefix="/auth", tags=["auth"])
+
+# One message for every login failure, so responses do not reveal whether an email exists.
+BAD_LOGIN = "Invalid email, password or code"
+
+
+# --- request and response bodies -------------------------------------------------------------
+
+
+class Credentials(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=passwords.MIN_LENGTH, max_length=passwords.MAX_LENGTH)
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(max_length=passwords.MAX_LENGTH)
+    totp_code: str | None = Field(default=None, max_length=10)
+
+
+class UserOut(BaseModel):
+    id: uuid.UUID
+    email: str
+    totp_enabled: bool
+
+    @classmethod
+    def of(cls, user: User) -> "UserOut":
+        return cls(id=user.id, email=user.email, totp_enabled=user.totp_enabled)
+
+
+class TotpSetup(BaseModel):
+    secret: str  # for typing into the app by hand
+    otpauth_uri: str  # for a QR code
+
+
+class TotpCode(BaseModel):
+    code: str = Field(max_length=10)
+
+
+# --- current user ----------------------------------------------------------------------------
+
+SessionCookie = Annotated[str | None, Cookie(alias=sessions.COOKIE_NAME)]
+
+
+async def current_user(db: Db, token: SessionCookie = None) -> User:
+    found = await sessions.lookup(db, token) if token else None
+    if found is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Not logged in")
+    return found[1]
+
+
+CurrentUser = Annotated[User, Depends(current_user)]
+
+
+def totp_aad(user: User) -> bytes:
+    """Ties the encrypted TOTP secret to this user and purpose (see duit.core.crypto)."""
+    return b"totp:" + user.id.bytes
+
+
+# --- endpoints -------------------------------------------------------------------------------
+
+
+@router.post("/register", status_code=status.HTTP_201_CREATED)
+async def register(body: Credentials, db: Db, settings: AppSettings) -> UserOut:
+    email = body.email.lower()
+    # Serialise registrations, so two requests cannot both see "no users yet" and both claim it.
+    await db.execute(text("SELECT pg_advisory_xact_lock(hashtext('duit:register'))"))
+    if not settings.registration_open and await db.scalar(select(exists().select_from(User))):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Registration is closed")
+    if await db.scalar(select(exists().where(User.email == email))):
+        raise HTTPException(status.HTTP_409_CONFLICT, "Email already registered")
+    user = User(email=email, password_hash=await passwords.hash_password(body.password))
+    db.add(user)
+    await db.commit()
+    return UserOut.of(user)
+
+
+@router.post("/login")
+async def login(
+    body: LoginRequest, request: Request, response: Response, db: Db, settings: AppSettings
+) -> UserOut:
+    user = await db.scalar(select(User).where(User.email == body.email.lower()))
+    if user is None:
+        await passwords.burn_time(body.password)
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, BAD_LOGIN)
+    if not await passwords.verify_password(user.password_hash, body.password):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, BAD_LOGIN)
+
+    if user.totp_enabled and user.totp_secret_enc is not None:
+        if not body.totp_code:
+            # Password was right; the client should now ask for the 6-digit code.
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "TOTP code required")
+        secret = decrypt(load_data_key(settings), user.totp_secret_enc, totp_aad(user)).decode()
+        step = totp.match_step(secret, body.totp_code, user.totp_last_step)
+        if step is None:
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, BAD_LOGIN)
+        user.totp_last_step = step
+
+    if passwords.needs_rehash(user.password_hash):
+        user.password_hash = await passwords.hash_password(body.password)
+    token = await sessions.create_session(db, user, request.headers.get("user-agent"))
+    await db.commit()
+    sessions.set_cookie(response, token)
+    return UserOut.of(user)
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(response: Response, db: Db, token: SessionCookie = None) -> None:
+    if token:
+        await sessions.end_session(db, token)
+    sessions.clear_cookie(response)
+
+
+@router.get("/me")
+async def me(user: CurrentUser) -> UserOut:
+    return UserOut.of(user)
+
+
+@router.post("/totp/setup")
+async def totp_setup(user: CurrentUser, db: Db, settings: AppSettings) -> TotpSetup:
+    """Start (or restart) 2FA setup. Not enforced until /auth/totp/confirm succeeds."""
+    if user.totp_enabled:
+        raise HTTPException(status.HTTP_409_CONFLICT, "2FA is already enabled")
+    secret = totp.new_secret()
+    user.totp_secret_enc = encrypt(load_data_key(settings), secret.encode(), totp_aad(user))
+    user.totp_last_step = None
+    await db.commit()
+    return TotpSetup(secret=secret, otpauth_uri=totp.provisioning_uri(secret, user.email))
+
+
+@router.post("/totp/confirm", status_code=status.HTTP_204_NO_CONTENT)
+async def totp_confirm(body: TotpCode, user: CurrentUser, db: Db, settings: AppSettings) -> None:
+    """Prove the authenticator app works; from now on login needs a code."""
+    if user.totp_enabled:
+        raise HTTPException(status.HTTP_409_CONFLICT, "2FA is already enabled")
+    if user.totp_secret_enc is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Call /auth/totp/setup first")
+    secret = decrypt(load_data_key(settings), user.totp_secret_enc, totp_aad(user)).decode()
+    step = totp.match_step(secret, body.code, user.totp_last_step)
+    if step is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Wrong code")
+    user.totp_last_step = step
+    user.totp_confirmed_at = datetime.now(UTC)
+    await db.commit()

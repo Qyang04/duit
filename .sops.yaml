@@ -1,0 +1,10 @@
+# SOPS encrypts matching files for these age public keys (public keys can only encrypt).
+#   age15zl4... = personal key (owner's PC): decrypts everything.
+#   age1ke68... = cluster key (Secret argocd/sops-age): KSOPS in Argo CD decrypts at deploy time.
+# Same keys as Qyang04/homelab; see its README and ADR-005 in the project spec.
+creation_rules:
+  - path_regex: \.enc\.yaml$
+    encrypted_regex: ^(data|stringData)$ # values encrypted, names and annotations stay readable
+    age: >-
+      age15zl4fcjfekvad02xn6pu9yyxc65hsvzc3chdghngxjczxgmqy52s6yfmtl,
+      age1ke68pvx8qnk6pj2dfrlwdm4ezqsv27xlhvqrccevv9qhzrjdaqrsug5fth

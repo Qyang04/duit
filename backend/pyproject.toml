@@ -5,10 +5,13 @@ description = "Duit: personal finance and tax copilot (API + worker)"
 requires-python = ">=3.13"
 dependencies = [
     "alembic>=1.20.1",
+    "argon2-cffi>=25.1.0",
     "asyncpg>=0.32.0",
+    "cryptography>=50.0.2",
     "fastapi>=0.162.7",
-    "pydantic>=2.14.3",
+    "pydantic[email]>=2.14.3",
     "pydantic-settings>=2.16.3",
+    "pyotp>=2.11.2",
     "sqlalchemy[asyncio]>=2.1.8",
     "uvicorn>=0.54.0",
 ]
@@ -43,6 +46,7 @@ include = ["duit", "tests"]
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+filterwarnings = ["error"] # a deprecation fails CI now, not silently later
 
 [tool.deptry]
 known_first_party = ["duit"]

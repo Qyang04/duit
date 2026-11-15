@@ -41,6 +41,7 @@ jobs:
           --health-interval 2s --health-timeout 3s --health-retries 15
     env:
       DUIT_DATABASE_URL: postgresql+asyncpg://duit:duit@127.0.0.1:5432/duit
+      DUIT_DATA_KEY: ZGV2LW9ubHkta2V5LW5vdC1mb3ItcmVhbC1kYXRhISE= # public dev/test key, see .env.example
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

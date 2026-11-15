@@ -32,6 +32,9 @@ spec:
             - name: DUIT_DATABASE_URL
               valueFrom:
                 secretKeyRef: { name: duit-db-app, key: uri }
+            - name: DUIT_DATA_KEY # encrypts sensitive columns; each overlay supplies its own
+              valueFrom:
+                secretKeyRef: { name: duit-app-secrets, key: data-key }
           readinessProbe: # out of the Service while the database is unreachable
             httpGet: { path: /readyz, port: http }
             periodSeconds: 10
