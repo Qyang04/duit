@@ -1,7 +1,10 @@
+# One origin for the browser: /api goes to the API, everything else to the web app. Same origin
+# means no CORS, and the SameSite=Strict session cookie is sent on every API call.
+# /healthz and /readyz are not routed: only the kubelet probes them, inside the cluster.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: duit-api
+  name: duit
   annotations:
     argocd.argoproj.io/sync-wave: "1"
     cert-manager.io/cluster-issuer: letsencrypt-prod
@@ -9,14 +12,20 @@ spec:
   ingressClassName: traefik
   tls:
     - hosts: [duit-staging.luiqiuyang.com]
-      secretName: duit-staging-tls
+      secretName: duit-staging-tls # same Secret as before: the certificate is reused
   rules:
     - host: duit-staging.luiqiuyang.com
       http:
         paths:
-          - path: /
+          - path: /api # Prefix matches /api and /api/..., not /apis
             pathType: Prefix
             backend:
               service:
                 name: duit-api
+                port: { name: http }
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: duit-web
                 port: { name: http }

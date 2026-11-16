@@ -1,0 +1,8 @@
+# Build context for Dockerfile.web (BuildKit reads <Dockerfile>.dockerignore before .dockerignore).
+# Only web sources: no backend, no local build output, no installed packages.
+*
+!web/
+web/node_modules
+web/.next
+web/out
+web/tsconfig.tsbuildinfo

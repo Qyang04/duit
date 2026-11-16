@@ -7,6 +7,8 @@ Personal finance and tax copilot for Malaysia. Runs on the [homelab](https://git
 | `backend/` | One Python package (`duit`), two entrypoints: API (FastAPI) and worker |
 | `docs/` | Architecture notes, ADRs, dependency budget |
 | `Dockerfile.api` | API image (no OCR libraries; those live only in the worker image) |
+| `Dockerfile.web` | Web image: Next.js static export on nginx-unprivileged, CSP computed at build |
+| `web/` | Next.js web app (static export) |
 
 ## Develop
 
@@ -32,16 +34,18 @@ uv run ruff check . ; uv run ruff format --check . ; uv run pyright ; uv run dep
 
 ## Deploy
 
-`deploy/` is Kustomize: `base/` (CNPG Postgres, migrate Job, API) plus one overlay per environment.
+`deploy/` is Kustomize: `base/` (CNPG Postgres, migrate Job, API, web) plus one overlay per environment.
 Argo CD (configured in [homelab](https://github.com/Qyang04/homelab), `clusters/prod/apps/duit-staging.yaml`)
 syncs `deploy/overlays/staging` to https://duit-staging.luiqiuyang.com in sync waves:
 
 1. Postgres (`Cluster duit-db`), wait until healthy. CNPG writes credentials to Secret `duit-db-app`.
 2. `duit-migrate` Job: `alembic upgrade head`. If it fails, the sync stops and the old API keeps serving.
-3. API Deployment, Service, Ingress.
+3. API and web Deployments and Services; one Ingress: `/api` to the API, everything else to the web app.
+   `/healthz` and `/readyz` are not routed publicly (only the kubelet probes them).
 
-Every push to `main` that changes the image deploys itself: after the scanned image is pushed, the
-`deploy-staging` CI job writes its `sha-<commit>` tag into `images[].newTag` and commits it; Argo CD rolls it out.
+Every push to `main` that changes an image deploys itself: CI builds, scans and pushes both images
+(`duit-api`, `duit-web`, one matrix job), then `deploy-staging` writes the `sha-<commit>` tag into both
+`images[].newTag` and commits it; Argo CD rolls it out.
 Rollback = revert that commit.
 
 ## Settings
@@ -152,6 +156,11 @@ cd web && npm ci && npm run dev                               # http://localhost
   (self-hosted, no Google requests), categories as rubber stamps, rows that "print".
   No component library: native `popover` and form controls; motion respects reduced-motion.
 - Keyboard: `/` search, `j`/`k` move, `c` or Enter stamps a category, Esc.
+- Production: `Dockerfile.web` builds `out/` and serves it with nginx-unprivileged (UID 101, port
+  8080, read-only root, `/tmp` emptyDir). `web/scripts/csp.mjs` hashes the inline scripts Next.js
+  emits and writes the CSP header (`script-src 'self'` + those hashes, no `unsafe-inline` for
+  scripts), plus `nosniff`, `Referrer-Policy`, `Permissions-Policy`, COOP. Hashed assets are cached
+  for a year, pages revalidate on every load.
 
 ## Health endpoints
 
