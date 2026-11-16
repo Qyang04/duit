@@ -18,8 +18,8 @@ PASSWORD = "correct horse battery"
 
 async def sign_in(http: httpx2.AsyncClient, email: str) -> None:
     creds = {"email": email, "password": PASSWORD}
-    assert (await http.post("/auth/register", json=creds)).status_code == 201
-    assert (await http.post("/auth/login", json=creds)).status_code == 200
+    assert (await http.post("/api/auth/register", json=creds)).status_code == 201
+    assert (await http.post("/api/auth/login", json=creds)).status_code == 200
 
 
 @pytest.fixture
@@ -33,7 +33,7 @@ async def ana(client: httpx2.AsyncClient) -> httpx2.AsyncClient:
 
 @pytest.fixture
 async def account(ana: httpx2.AsyncClient) -> str:
-    response = await ana.post("/accounts", json={"type": "bank", "name": "CIMB savings"})
+    response = await ana.post("/api/accounts", json={"type": "bank", "name": "CIMB savings"})
     return response.json()["id"]
 
 
@@ -51,11 +51,11 @@ async def upload(
 ) -> httpx2.Response:
     data = {"password": password} if password is not None else {}
     files = {"file": ("statement.pdf", pdf, "application/pdf")}
-    return await http.post(f"/accounts/{account_id}/statements/{step}", data=data, files=files)
+    return await http.post(f"/api/accounts/{account_id}/statements/{step}", data=data, files=files)
 
 
 async def transactions(http: httpx2.AsyncClient) -> list[dict[str, Any]]:
-    return (await http.get("/transactions")).json()["items"]
+    return (await http.get("/api/transactions")).json()["items"]
 
 
 async def test_preview_shows_lines_and_saves_nothing(
@@ -91,7 +91,7 @@ async def test_the_stored_statement_password_is_used(
     ana: httpx2.AsyncClient, account: str, pdf: bytes
 ) -> None:
     assert (await upload(ana, account, "preview", pdf, password=None)).status_code == 422
-    await ana.patch(f"/accounts/{account}", json={"statement_password": PDF_PASSWORD})
+    await ana.patch(f"/api/accounts/{account}", json={"statement_password": PDF_PASSWORD})
 
     assert (await upload(ana, account, "preview", pdf, password=None)).status_code == 200
 
@@ -113,7 +113,7 @@ async def test_too_large(ana: httpx2.AsyncClient, account: str) -> None:
 
 
 async def test_account_currency_must_match(ana: httpx2.AsyncClient, pdf: bytes) -> None:
-    usd = await ana.post("/accounts", json={"type": "bank", "name": "USD", "currency": "USD"})
+    usd = await ana.post("/api/accounts", json={"type": "bank", "name": "USD", "currency": "USD"})
     assert (await upload(ana, usd.json()["id"], "preview", pdf)).status_code == 422
 
 

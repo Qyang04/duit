@@ -74,11 +74,11 @@ that KSOPS uses inside Argo CD. Only values (`data`/`stringData`) are encrypted;
 
 | Endpoint | What |
 |---|---|
-| `POST /auth/register` | Create an account (first account only, unless registration is open) |
-| `POST /auth/login` | Email + password (+ `totp_code` once 2FA is on); sets the session cookie |
-| `POST /auth/logout` | Deletes the server-side session |
-| `GET /auth/me` | Current user, 401 if not logged in |
-| `POST /auth/totp/setup`, `/auth/totp/confirm` | Enrol an authenticator app; 2FA is enforced after confirm |
+| `POST /api/auth/register` | Create an account (first account only, unless registration is open) |
+| `POST /api/auth/login` | Email + password (+ `totp_code` once 2FA is on); sets the session cookie |
+| `POST /api/auth/logout` | Deletes the server-side session |
+| `GET /api/auth/me` | Current user, 401 if not logged in |
+| `POST /api/auth/totp/setup`, `/api/auth/totp/confirm` | Enrol an authenticator app; 2FA is enforced after confirm |
 
 - Passwords: argon2id (19 MiB, 2 passes, 1 lane; OWASP minimum), rehashed on login if parameters change.
 - Sessions: random 256-bit token in a `__Host-duit_session` cookie (HttpOnly, Secure, SameSite=Strict);
@@ -93,9 +93,9 @@ Tables: `accounts`, `categories` (two levels, seeded with defaults at registrati
 
 | Endpoint | What |
 |---|---|
-| `GET/POST /accounts`, `GET/PATCH/DELETE /accounts/{id}` | Accounts; `account_number` and `statement_password` are write-only (only `account_last4` and `has_*` flags come back) |
-| `GET/POST /categories`, `PATCH/DELETE /categories/{id}` | Flat list with `parent_id`; rename, move (`parent_id`, `null` = top level), delete |
-| `GET/POST /transactions`, `GET/PATCH/DELETE /transactions/{id}` | Filters: `account_id`, `category_id` (a parent includes its children), `uncategorised`, `date_from`, `date_to`, `q`; `limit` + `cursor` |
+| `GET/POST /api/accounts`, `GET/PATCH/DELETE /accounts/{id}` | Accounts; `account_number` and `statement_password` are write-only (only `account_last4` and `has_*` flags come back) |
+| `GET/POST /api/categories`, `PATCH/DELETE /categories/{id}` | Flat list with `parent_id`; rename, move (`parent_id`, `null` = top level), delete |
+| `GET/POST /api/transactions`, `GET/PATCH/DELETE /transactions/{id}` | Filters: `account_id`, `category_id` (a parent includes its children), `uncategorised`, `date_from`, `date_to`, `q`; `limit` + `cursor` |
 
 - Another user's row is a 404, never a 403, so ids cannot be probed. Request bodies reject unknown
   fields (no mass assignment of `user_id`, `dedupe_key`, ...).
@@ -118,7 +118,7 @@ Tables: `accounts`, `categories` (two levels, seeded with defaults at registrati
 
 ## Statement import
 
-`POST /accounts/{id}/statements/preview` and `/import` (multipart: `file`, optional `password`,
+`POST /api/accounts/{id}/statements/preview` and `/import` (multipart: `file`, optional `password`,
 query `bank=cimb`). Preview parses and flags lines already in the ledger, saving nothing; import
 parses the same PDF again on the server and inserts the new lines.
 
@@ -134,6 +134,24 @@ parses the same PDF again on the server and inserts the new lines.
 - Local tools (run on your own files, nothing leaves your machine):
   `uv run python tools/statement_layout.py <pdf>` prints a masked layout for writing a parser;
   `uv run python -m tools.parse_statement <pdf>` prints a shareable summary (`--show`: private detail).
+
+## Web (`web/`)
+
+Next.js (App Router) as a static export (ADR-002): `npm run build` writes plain files to `out/`.
+The API lives under `/api` on the same origin, so the `SameSite=Strict` session cookie just works.
+
+```bash
+cd backend && uv run uvicorn duit.main_api:app --port 8000   # API
+cd web && npm ci && npm run dev                               # http://localhost:3000, proxies /api
+```
+
+- Typed client: `npm run gen:api` turns `web/openapi.json` into `src/api/schema.d.ts`;
+  `uv run python -m tools.export_openapi` (backend) refreshes the schema. CI fails on drift.
+- Design, "Buku Akaun": a bank passbook. Paper and ink tokens with a dark "night ledger"
+  (`src/app/globals.css`), Young Serif / Hanken Grotesk / IBM Plex Mono via `next/font`
+  (self-hosted, no Google requests), categories as rubber stamps, rows that "print".
+  No component library: native `popover` and form controls; motion respects reduced-motion.
+- Keyboard: `/` search, `j`/`k` move, `c` or Enter stamps a category, Esc.
 
 ## Health endpoints
 

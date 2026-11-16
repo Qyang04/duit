@@ -3,7 +3,7 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, Response, status
+from fastapi import APIRouter, FastAPI, Request, Response, status
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
@@ -31,12 +31,19 @@ app = FastAPI(
     title="Duit API",
     lifespan=lifespan,
     # Interactive docs only outside prod; the schema itself stays available for the web client.
-    docs_url=None if settings.environment == "prod" else "/docs",
+    docs_url=None if settings.environment == "prod" else "/api/docs",
     redoc_url=None,
+    openapi_url="/api/openapi.json",
 )
-app.include_router(auth_router)
+
+# Everything the web app calls lives under /api, in the app itself rather than through a proxy
+# rewrite: the same URLs in dev, tests and prod. The web app and the API share one origin, which
+# the SameSite=Strict session cookie needs. Health probes stay at the root (kubelet only).
+api = APIRouter(prefix="/api")
+api.include_router(auth_router)
 for ledger_router in (accounts.router, categories.router, transactions.router, statements.router):
-    app.include_router(ledger_router)
+    api.include_router(ledger_router)
+app.include_router(api)
 
 
 @app.get("/healthz", tags=["ops"])

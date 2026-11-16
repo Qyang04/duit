@@ -1,0 +1,403 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------------------------
+   Buku Akaun: the design system. A Malaysian bank passbook, not a SaaS dashboard.
+   Paper and ink, ruled lines, a red margin, rubber stamps for categories, printer-style figures.
+   Every colour is a token, so light ("paper") and dark ("night ledger") are one stylesheet.
+   ------------------------------------------------------------------------------------------- */
+
+:root {
+  --paper: #f3eee3;
+  --paper-2: #ebe4d5;
+  --paper-3: #dfd5c1;
+  --ink: #1d2433;
+  --ink-2: #4b5364;
+  --ink-3: #8b8d93;
+  --rule: rgb(64 104 168 / 0.17);
+  --margin: rgb(196 84 68 / 0.5);
+  --credit: #2d6a49;
+  --debit: #ad3f2c;
+  --stamp: #2f4b8c;
+  --stamp-income: #2d6a49;
+  --chop: #b8392a;
+  --highlight: rgb(244 205 80 / 0.34);
+  --cover: #1e2b4a;
+  --cover-2: #16203a;
+  --foil: #d9b76c;
+  --foil-2: #f3dfa5;
+  --shadow: 28 24 18;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #12151c;
+    --paper-2: #191d26;
+    --paper-3: #232937;
+    --ink: #ece5d5;
+    --ink-2: #b3ac9d;
+    --ink-3: #7b7972;
+    --rule: rgb(140 170 225 / 0.09);
+    --margin: rgb(232 128 108 / 0.35);
+    --credit: #7cc89b;
+    --debit: #f08b74;
+    --stamp: #9fb5f2;
+    --stamp-income: #7cc89b;
+    --chop: #f07360;
+    --highlight: rgb(201 168 58 / 0.28);
+    --cover: #0e1526;
+    --cover-2: #0a0f1c;
+    --shadow: 0 0 0;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: #12151c;
+  --paper-2: #191d26;
+  --paper-3: #232937;
+  --ink: #ece5d5;
+  --ink-2: #b3ac9d;
+  --ink-3: #7b7972;
+  --rule: rgb(140 170 225 / 0.09);
+  --margin: rgb(232 128 108 / 0.35);
+  --credit: #7cc89b;
+  --debit: #f08b74;
+  --stamp: #9fb5f2;
+  --stamp-income: #7cc89b;
+  --chop: #f07360;
+  --highlight: rgb(201 168 58 / 0.28);
+  --cover: #0e1526;
+  --cover-2: #0a0f1c;
+  --shadow: 0 0 0;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-2: var(--paper-2);
+  --color-paper-3: var(--paper-3);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-rule: var(--rule);
+  --color-margin: var(--margin);
+  --color-credit: var(--credit);
+  --color-debit: var(--debit);
+  --color-stamp: var(--stamp);
+  --color-chop: var(--chop);
+  --color-foil: var(--foil);
+  --color-cover: var(--cover);
+  --font-display: var(--ff-display), Georgia, serif;
+  --font-sans: var(--ff-sans), system-ui, sans-serif;
+  --font-mono: var(--ff-mono), ui-monospace, monospace;
+}
+
+/* Paper grain: an SVG noise tile, so the page never looks like a flat screen colour. */
+:root {
+  --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.45 0 0 0 0 0.38 0 0 0 0 0.28 0 0 0 0.09 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+html,
+body {
+  background-color: var(--paper);
+  color: var(--ink);
+}
+
+body {
+  background-image: var(--grain);
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  min-height: 100dvh;
+}
+
+::selection {
+  background: var(--highlight);
+  color: var(--ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--stamp);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* Figures line up in columns, like a passbook printer. */
+.figures {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums slashed-zero;
+  letter-spacing: -0.01em;
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* --- rubber stamps (categories) ----------------------------------------------------------- */
+
+.stamp {
+  --tilt: 0deg;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  padding: 0.18rem 0.55rem 0.14rem;
+  border: 3px double currentColor;
+  border-radius: 5px;
+  color: var(--stamp);
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transform: rotate(var(--tilt));
+  /* Ink never prints evenly: a noise mask knocks small holes into the stamp. */
+  mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='90' height='90'><filter id='i'><feTurbulence type='fractalNoise' baseFrequency='1.7' numOctaves='2'/><feComponentTransfer><feFuncA type='discrete' tableValues='1 1 1 1 1 0.55 1 1 0.2 1'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23i)'/></svg>");
+  mask-size: 90px 90px;
+  opacity: 0.92;
+  transition:
+    opacity 160ms,
+    transform 160ms;
+}
+
+.stamp[data-income="true"] {
+  color: var(--stamp-income);
+}
+
+.stamp[data-empty="true"] {
+  border: 1.5px dashed var(--ink-3);
+  color: var(--ink-3);
+  font-weight: 600;
+  mask-image: none;
+  opacity: 0.75;
+}
+
+button:hover > .stamp,
+button:focus-visible > .stamp {
+  opacity: 1;
+  transform: rotate(var(--tilt)) scale(1.04);
+}
+
+/* --- the ledger page ------------------------------------------------------------------------ */
+
+.ledger {
+  position: relative;
+}
+
+/* The red margin line every exercise book and ledger has. */
+.ledger::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  left: 5.6rem;
+  width: 1px;
+  background: var(--margin);
+  box-shadow: 3px 0 0 var(--margin);
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+@media (max-width: 640px) {
+  .ledger::before {
+    left: 4.4rem;
+  }
+}
+
+.entry {
+  border-bottom: 1px solid var(--rule);
+  position: relative;
+}
+
+/* Rows "print" left to right in small steps, like a passbook printer head. */
+@keyframes print {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+.entry[data-print="true"] {
+  animation: print 420ms steps(18, end) both;
+  animation-delay: calc(var(--i, 0) * 32ms);
+}
+
+/* The focused row (j/k) gets a highlighter swipe. */
+.entry::after {
+  content: "";
+  position: absolute;
+  inset: 0.9rem auto auto 6rem;
+  height: 1.45rem;
+  width: 0;
+  background: var(--highlight);
+  border-radius: 2px 10px 3px 8px;
+  z-index: -1;
+  transition: width 260ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.entry[data-focused="true"]::after {
+  width: min(28rem, calc(100% - 6rem));
+}
+
+/* Sticky month headings carry the paper grain, so they never look like a flat band. */
+.month-head {
+  background-color: var(--paper);
+  background-image: var(--grain);
+}
+
+/* Perforated edge for the filter slip. */
+.perforated {
+  position: relative;
+  background: var(--paper-2);
+}
+
+.perforated::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -5px;
+  height: 10px;
+  background: radial-gradient(circle at 5px 5px, var(--paper) 3.2px, transparent 3.6px) 0 0 / 14px
+    10px repeat-x;
+}
+
+.field {
+  background: transparent;
+  border: 0;
+  border-bottom: 1.5px solid var(--paper-3);
+  padding: 0.35rem 0.1rem;
+  color: var(--ink);
+  transition: border-color 160ms;
+}
+
+.field:focus {
+  outline: none;
+  border-bottom-color: var(--stamp);
+}
+
+.field::placeholder {
+  color: var(--ink-3);
+}
+
+kbd {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  padding: 0.05rem 0.35rem;
+  border: 1px solid var(--paper-3);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  color: var(--ink-2);
+  background: var(--paper);
+}
+
+/* Popovers sit in the browser's top layer; we only style them. */
+[popover] {
+  margin: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  overflow: visible;
+}
+
+/* A blinking printer cursor. */
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.cursor {
+  display: inline-block;
+  width: 0.55em;
+  height: 1em;
+  vertical-align: -0.12em;
+  background: currentColor;
+  animation: blink 1s steps(1) infinite;
+}
+
+/* --- the passbook cover (login) ------------------------------------------------------------- */
+
+.cover {
+  background:
+    var(--grain),
+    radial-gradient(120% 90% at 30% 20%, color-mix(in srgb, var(--cover) 80%, white 8%), transparent 60%),
+    linear-gradient(160deg, var(--cover), var(--cover-2));
+  box-shadow:
+    inset 10px 0 18px -10px rgb(0 0 0 / 0.55),
+    inset -1px 0 0 rgb(255 255 255 / 0.05),
+    0 30px 60px -20px rgb(var(--shadow) / 0.45),
+    0 12px 24px -12px rgb(var(--shadow) / 0.35);
+}
+
+/* Stitching along the cover edge. */
+.stitched {
+  outline: 1.5px dashed color-mix(in srgb, var(--foil) 55%, transparent);
+  outline-offset: -14px;
+}
+
+.foil {
+  background: linear-gradient(
+    100deg,
+    var(--foil) 0%,
+    var(--foil-2) 28%,
+    var(--foil) 46%,
+    #a8823c 62%,
+    var(--foil-2) 82%,
+    var(--foil) 100%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: foil-sheen 6s ease-in-out infinite alternate;
+  /* Embossed: a dark edge below, a light edge above. */
+  filter: drop-shadow(0 1px 0 rgb(0 0 0 / 0.55)) drop-shadow(0 -1px 0 rgb(255 255 255 / 0.12));
+}
+
+@keyframes foil-sheen {
+  to {
+    background-position: 100% 0;
+  }
+}
+
+.engraved {
+  background: rgb(0 0 0 / 0.22);
+  border: 1px solid rgb(0 0 0 / 0.35);
+  border-bottom-color: color-mix(in srgb, var(--foil) 40%, transparent);
+  border-radius: 6px;
+  color: #f1e9d6;
+  box-shadow: inset 0 2px 4px rgb(0 0 0 / 0.35);
+  transition:
+    border-color 160ms,
+    box-shadow 160ms;
+}
+
+.engraved:focus {
+  outline: none;
+  border-color: var(--foil);
+  box-shadow:
+    inset 0 2px 4px rgb(0 0 0 / 0.35),
+    0 0 0 3px color-mix(in srgb, var(--foil) 25%, transparent);
+}
+
+.engraved::placeholder {
+  color: rgb(241 233 214 / 0.35);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}

@@ -21,11 +21,13 @@ PASSWORD = "correct horse battery"
 
 
 async def register(client: httpx2.AsyncClient, email: str = EMAIL) -> httpx2.Response:
-    return await client.post("/auth/register", json={"email": email, "password": PASSWORD})
+    return await client.post("/api/auth/register", json={"email": email, "password": PASSWORD})
 
 
 async def login(client: httpx2.AsyncClient, **extra: str) -> httpx2.Response:
-    return await client.post("/auth/login", json={"email": EMAIL, "password": PASSWORD, **extra})
+    return await client.post(
+        "/api/auth/login", json={"email": EMAIL, "password": PASSWORD, **extra}
+    )
 
 
 @pytest.fixture
@@ -74,7 +76,7 @@ async def test_duplicate_email_is_rejected(client: httpx2.AsyncClient) -> None:
 
 
 async def test_short_password_is_rejected(client: httpx2.AsyncClient) -> None:
-    response = await client.post("/auth/register", json={"email": EMAIL, "password": "short"})
+    response = await client.post("/api/auth/register", json={"email": EMAIL, "password": "short"})
     assert response.status_code == 422
 
 
@@ -92,7 +94,7 @@ async def test_login_sets_a_hardened_session_cookie(client: httpx2.AsyncClient) 
         assert flag in cookie
     assert "Domain" not in cookie
 
-    me = await client.get("/auth/me")
+    me = await client.get("/api/auth/me")
     assert me.status_code == 200
     assert me.json()["email"] == EMAIL
 
@@ -112,9 +114,9 @@ async def test_only_a_hash_of_the_session_token_is_stored(
 
 async def test_wrong_password_and_unknown_email_look_the_same(client: httpx2.AsyncClient) -> None:
     await register(client)
-    wrong = await client.post("/auth/login", json={"email": EMAIL, "password": "nope" * 4})
+    wrong = await client.post("/api/auth/login", json={"email": EMAIL, "password": "nope" * 4})
     unknown = await client.post(
-        "/auth/login", json={"email": "nobody@example.com", "password": PASSWORD}
+        "/api/auth/login", json={"email": "nobody@example.com", "password": PASSWORD}
     )
 
     assert wrong.status_code == unknown.status_code == 401
@@ -122,7 +124,7 @@ async def test_wrong_password_and_unknown_email_look_the_same(client: httpx2.Asy
 
 
 async def test_me_without_a_session_is_401(client: httpx2.AsyncClient) -> None:
-    assert (await client.get("/auth/me")).status_code == 401
+    assert (await client.get("/api/auth/me")).status_code == 401
 
 
 async def test_logout_deletes_the_session(
@@ -132,11 +134,11 @@ async def test_logout_deletes_the_session(
     await login(client)
     token = client.cookies[COOKIE_NAME]
 
-    assert (await client.post("/auth/logout")).status_code == 204
+    assert (await client.post("/api/auth/logout")).status_code == 204
     assert await conn.scalar(select(UserSession.id)) is None
     # Even a client that kept the old cookie is logged out: the server forgot the session.
     client.cookies.set(COOKIE_NAME, token)
-    assert (await client.get("/auth/me")).status_code == 401
+    assert (await client.get("/api/auth/me")).status_code == 401
 
 
 async def test_idle_session_expires(client: httpx2.AsyncClient, conn: AsyncConnection) -> None:
@@ -146,7 +148,7 @@ async def test_idle_session_expires(client: httpx2.AsyncClient, conn: AsyncConne
         update(UserSession).values(last_seen_at=datetime.now(UTC) - timedelta(days=3))
     )
 
-    assert (await client.get("/auth/me")).status_code == 401
+    assert (await client.get("/api/auth/me")).status_code == 401
     assert await conn.scalar(select(UserSession.id)) is None
 
 
@@ -156,12 +158,12 @@ async def test_idle_session_expires(client: httpx2.AsyncClient, conn: AsyncConne
 async def enable_totp(client: httpx2.AsyncClient) -> TOTP:
     await register(client)
     await login(client)
-    setup = await client.post("/auth/totp/setup")
+    setup = await client.post("/api/auth/totp/setup")
     assert setup.status_code == 200
     authenticator = TOTP(setup.json()["secret"])
-    confirm = await client.post("/auth/totp/confirm", json={"code": authenticator.now()})
+    confirm = await client.post("/api/auth/totp/confirm", json={"code": authenticator.now()})
     assert confirm.status_code == 204
-    await client.post("/auth/logout")
+    await client.post("/api/auth/logout")
     return authenticator
 
 
@@ -175,7 +177,7 @@ async def test_totp_secret_is_stored_encrypted(
 ) -> None:
     await register(client)
     await login(client)
-    secret = (await client.post("/auth/totp/setup")).json()["secret"]
+    secret = (await client.post("/api/auth/totp/setup")).json()["secret"]
 
     stored = await conn.scalar(select(User.totp_secret_enc))
     assert stored is not None
@@ -185,8 +187,8 @@ async def test_totp_secret_is_stored_encrypted(
 async def test_totp_is_not_enforced_until_confirmed(client: httpx2.AsyncClient) -> None:
     await register(client)
     await login(client)
-    await client.post("/auth/totp/setup")
-    await client.post("/auth/logout")
+    await client.post("/api/auth/totp/setup")
+    await client.post("/api/auth/logout")
 
     assert (await login(client)).status_code == 200
 
@@ -194,10 +196,10 @@ async def test_totp_is_not_enforced_until_confirmed(client: httpx2.AsyncClient) 
 async def test_wrong_confirmation_code_is_rejected(client: httpx2.AsyncClient) -> None:
     await register(client)
     await login(client)
-    await client.post("/auth/totp/setup")
+    await client.post("/api/auth/totp/setup")
 
-    assert (await client.post("/auth/totp/confirm", json={"code": "000000"})).status_code == 400
-    assert (await client.get("/auth/me")).json()["totp_enabled"] is False
+    assert (await client.post("/api/auth/totp/confirm", json={"code": "000000"})).status_code == 400
+    assert (await client.get("/api/auth/me")).json()["totp_enabled"] is False
 
 
 async def test_login_with_totp(client: httpx2.AsyncClient) -> None:

@@ -66,6 +66,37 @@ jobs:
         run: uv run alembic check
       - name: Tests
         run: uv run pytest
+      - name: OpenAPI schema is committed and current
+        # The web client is generated from web/openapi.json: an API change without a regenerated
+        # schema would leave the web app calling endpoints that no longer exist.
+        run: |
+          uv run python -m tools.export_openapi
+          git diff --exit-code -- ../web/openapi.json
+
+  web:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install (exactly as locked)
+        run: npm ci --no-audit --no-fund
+      - name: Generated API client matches openapi.json
+        run: npm run check:api
+      - name: Types
+        run: npm run typecheck
+      - name: Static export
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
 
   image:
     needs: test
