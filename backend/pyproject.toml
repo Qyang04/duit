@@ -14,6 +14,8 @@ dependencies = [
     "pyotp>=2.11.2",
     "sqlalchemy[asyncio]>=2.1.8",
     "uvicorn>=0.54.0",
+    "pdfplumber>=0.11.10",
+    "pdfminer-six>=20260107",
 ]
 
 [dependency-groups]
@@ -41,7 +43,7 @@ select = ["E", "F", "I", "B", "UP", "SIM", "S"]
 
 [tool.pyright]
 typeCheckingMode = "strict"
-include = ["duit", "tests"]
+include = ["duit", "tests", "tools"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

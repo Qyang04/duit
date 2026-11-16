@@ -5,3 +5,8 @@ __pycache__/
 .env
 *.env
 !*.enc.env
+
+# Bank statements and other documents never enter the repo
+*.pdf
+*.PDF
+layout*.txt
