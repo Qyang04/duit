@@ -9,11 +9,13 @@ from sqlalchemy.orm import DeclarativeBase
 from duit.core.settings import Settings
 
 # Stable, predictable constraint names, so later migrations can alter or drop them by name.
+# The _N_ tokens join every column of a multi-column constraint (user_id_name, ...), so two
+# composite constraints that start with the same column (user_id) still get distinct names.
 NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",
-    "uq": "uq_%(table_name)s_%(column_0_name)s",
+    "uq": "uq_%(table_name)s_%(column_0_N_name)s",
     "ck": "ck_%(table_name)s_%(constraint_name)s",
-    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+    "fk": "fk_%(table_name)s_%(column_0_N_name)s_%(referred_table_name)s",
     "pk": "pk_%(table_name)s",
 }
 

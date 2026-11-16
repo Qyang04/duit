@@ -87,6 +87,20 @@ that KSOPS uses inside Argo CD. Only values (`data`/`stringData`) are encrypted;
   bound to its user.
 - Login failures return one message and take the same time whether or not the email exists.
 
+## Ledger
+
+Tables: `accounts`, `categories` (two levels, seeded with defaults at registration), `transactions`.
+
+- Money is a signed `bigint` in sen (negative = money out) plus an ISO currency code; never floats.
+- `posted_on` is a `date`, not a timestamp: statements give dates, and UTC midnight is the wrong
+  day in Malaysia.
+- Tenant isolation in the database: references between ledger tables are composite foreign keys
+  on `(user_id, id)`, so a row can never point at another user's account or category.
+- Deleting an account with transactions fails; deleting a category un-categorises its
+  transactions (`ON DELETE SET NULL (category_id)`); deleting a user removes the whole ledger.
+- `dedupe_key` is unique per account, so re-importing a statement line is a no-op.
+- Account numbers and statement passwords are AES-GCM encrypted with `DUIT_DATA_KEY`.
+
 ## Health endpoints
 
 Used by Kubernetes and monitoring, not by the app's users.

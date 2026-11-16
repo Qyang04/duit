@@ -5,12 +5,13 @@ from datetime import UTC, datetime, timedelta
 import httpx2
 import pytest
 from pyotp.totp import TOTP
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from duit.auth.models import User, UserSession
 from duit.auth.sessions import COOKIE_NAME
 from duit.core.settings import get_settings
+from duit.ledger.models import Category
 from duit.main_api import app
 
 pytestmark = pytest.mark.anyio
@@ -48,6 +49,15 @@ async def test_register_stores_lowercase_email_and_argon2_hash(
     assert stored is not None
     assert stored.startswith("$argon2id$")
     assert PASSWORD not in stored
+
+
+async def test_register_seeds_default_categories(
+    client: httpx2.AsyncClient, conn: AsyncConnection
+) -> None:
+    user_id = (await register(client)).json()["id"]
+
+    count = await conn.scalar(select(func.count()).where(Category.user_id == user_id))
+    assert count is not None and count > 0
 
 
 async def test_only_the_first_account_can_register_by_default(client: httpx2.AsyncClient) -> None:

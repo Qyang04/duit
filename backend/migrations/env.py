@@ -7,6 +7,7 @@ from alembic import context
 from sqlalchemy.engine import Connection
 
 import duit.auth.models  # noqa: F401  (registers the tables on Base.metadata)
+import duit.ledger.models  # noqa: F401
 from duit.core.db import Base, create_engine
 from duit.core.settings import get_settings
 
