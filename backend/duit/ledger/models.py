@@ -137,6 +137,9 @@ class Transaction(Base):
         Index("ix_transactions_user_posted", "user_id", text("posted_on DESC"), text("id DESC")),
         Index("ix_transactions_user_category", "user_id", "category_id"),
     )
+    # Read server-generated values (updated_at) back with RETURNING on UPDATE too, so responses
+    # built after commit never trigger a lazy load.
+    __mapper_args__ = {"eager_defaults": True}
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, server_default=text("uuidv7()"))
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))

@@ -91,6 +91,21 @@ that KSOPS uses inside Argo CD. Only values (`data`/`stringData`) are encrypted;
 
 Tables: `accounts`, `categories` (two levels, seeded with defaults at registration), `transactions`.
 
+| Endpoint | What |
+|---|---|
+| `GET/POST /accounts`, `GET/PATCH/DELETE /accounts/{id}` | Accounts; `account_number` and `statement_password` are write-only (only `account_last4` and `has_*` flags come back) |
+| `GET/POST /categories`, `PATCH/DELETE /categories/{id}` | Flat list with `parent_id`; rename, move (`parent_id`, `null` = top level), delete |
+| `GET/POST /transactions`, `GET/PATCH/DELETE /transactions/{id}` | Filters: `account_id`, `category_id` (a parent includes its children), `uncategorised`, `date_from`, `date_to`, `q`; `limit` + `cursor` |
+
+- Another user's row is a 404, never a 403, so ids cannot be probed. Request bodies reject unknown
+  fields (no mass assignment of `user_id`, `dedupe_key`, ...).
+- PATCH: omitted field = unchanged, `null` = cleared (rejected for required fields).
+- Categories: two levels; subcategories take `is_income` from their parent; a category with
+  children cannot be deleted or moved under another one.
+- Transactions: currency defaults to the account's; a foreign currency needs `fx_rate`
+  (account currency per unit; sent and returned as a string, never a float).
+- Pagination is keyset on `(posted_on, id)`: `next_cursor` is opaque, `null` on the last page.
+
 - Money is a signed `bigint` in sen (negative = money out) plus an ISO currency code; never floats.
 - `posted_on` is a `date`, not a timestamp: statements give dates, and UTC midnight is the wrong
   day in Malaysia.
