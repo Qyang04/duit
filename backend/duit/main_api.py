@@ -11,7 +11,7 @@ from duit.auth.router import router as auth_router
 from duit.core.crypto import load_data_key
 from duit.core.db import create_engine
 from duit.core.settings import get_settings
-from duit.ledger import accounts, categories, transactions
+from duit.ledger import accounts, categories, statements, transactions
 
 settings = get_settings()
 
@@ -35,7 +35,7 @@ app = FastAPI(
     redoc_url=None,
 )
 app.include_router(auth_router)
-for ledger_router in (accounts.router, categories.router, transactions.router):
+for ledger_router in (accounts.router, categories.router, transactions.router, statements.router):
     app.include_router(ledger_router)
 
 

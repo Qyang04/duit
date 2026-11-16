@@ -116,6 +116,25 @@ Tables: `accounts`, `categories` (two levels, seeded with defaults at registrati
 - `dedupe_key` is unique per account, so re-importing a statement line is a no-op.
 - Account numbers and statement passwords are AES-GCM encrypted with `DUIT_DATA_KEY`.
 
+## Statement import
+
+`POST /accounts/{id}/statements/preview` and `/import` (multipart: `file`, optional `password`,
+query `bank=cimb`). Preview parses and flags lines already in the ledger, saving nothing; import
+parses the same PDF again on the server and inserts the new lines.
+
+- Parsers (`duit/parsers/statements/`) are pure functions from positioned words to a statement;
+  `read_pdf` (pdfplumber) is the only PDF code. CIMB: columns from each page's header row, a
+  transaction starts with a date left of the Date header, indented lines are its description.
+- Reconciliation: opening balance + every amount must reproduce every printed balance and the
+  closing balance, or the statement is rejected. Error messages never contain amounts or names.
+- `dedupe_key` = SHA-256 of account, date, amount, running balance, description and an occurrence
+  count; inserts use `ON CONFLICT DO NOTHING`, so re-importing (even concurrently) is a no-op.
+- The PDF password comes from the request or the account's stored (encrypted) statement password.
+- Limits: 10 MB, `%PDF-` magic bytes, 60 pages. Parsing runs in a thread pool.
+- Local tools (run on your own files, nothing leaves your machine):
+  `uv run python tools/statement_layout.py <pdf>` prints a masked layout for writing a parser;
+  `uv run python -m tools.parse_statement <pdf>` prints a shareable summary (`--show`: private detail).
+
 ## Health endpoints
 
 Used by Kubernetes and monitoring, not by the app's users.

@@ -16,6 +16,7 @@ dependencies = [
     "uvicorn>=0.54.0",
     "pdfplumber>=0.11.10",
     "pdfminer-six>=20260107",
+    "python-multipart>=0.0.33",
 ]
 
 [dependency-groups]
@@ -58,4 +59,5 @@ known_first_party = ["duit"]
 DEP002 = [
     "uvicorn", # the ASGI server: run as a command (Dockerfile), never imported
     "asyncpg", # Postgres driver: loaded by SQLAlchemy from the "+asyncpg" URL scheme
+    "python-multipart", # parses file uploads: loaded by FastAPI for File() and Form()
 ]
