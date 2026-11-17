@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     imap_password: SecretStr | None = None  # an app password, never the account's own
     imap_folder: str = "INBOX"
     imap_owner: str | None = None  # email of the Duit user the alerts belong to
+    # The receiving mail server whose Authentication-Results (DKIM) alert templates trust: the
+    # topmost such header, written by this server on arrival (see duit.parsers.alerts.engine).
+    alerts_authserv_id: str = "mx.google.com"
 
     def imap(self) -> "ImapConfig | None":
         if not (self.imap_host and self.imap_username and self.imap_password and self.imap_owner):

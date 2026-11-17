@@ -18,9 +18,9 @@ import email.policy
 import re
 from email.message import EmailMessage
 from email.parser import BytesParser
-from html.parser import HTMLParser
 from pathlib import Path
 
+from duit.parsers.alerts.text import html_lines
 from tools.statement_layout import KEEP as STATEMENT_WORDS
 
 # Words alert emails are made of (EN + BM), on top of the statement words.
@@ -46,11 +46,9 @@ KEEP = STATEMENT_WORDS | EMAIL_WORDS
 PUNCTUATION = ":.,()[]!?;'\"*-|"
 
 # Headers shown as they are: they describe the sender and the mail system, not the recipient.
-SENDER_HEADERS = ("From", "Sender", "Reply-To", "Return-Path")
+SENDER_HEADERS = ("From", "Sender", "Reply-To")
+SYSTEM_HEADERS = ("Return-Path",)
 AUTH_HEADERS = ("Authentication-Results", "ARC-Authentication-Results", "Received-SPF")
-BLOCK_TAGS = frozenset(
-    "p div br tr li h1 h2 h3 h4 h5 h6 table tbody thead tfoot section header footer hr".split()  # noqa: SIM905
-)
 
 
 def mask(word: str) -> str:
@@ -71,67 +69,35 @@ def mask_line(line: str) -> str:
     return " ".join(mask(w) for w in line.split())
 
 
-def mask_digits(text: str) -> str:
-    """For mail-system headers: domains and results stay, ids and addresses' numbers do not."""
-    return re.sub(r"[0-9]", "9", text)
+KEYS = ("header.i=", "header.d=", "smtp.mailfrom=", "smtp.helo=")
 
 
-class HtmlText(HTMLParser):
-    """HTML to lines of text: a line per block element, " | " between table cells."""
+def mask_system(text: str) -> str:
+    """For mail-system headers: domains and results stay. Digits and the local part of every
+    address go: bounce and forwarding addresses carry the recipient's own address."""
 
-    def __init__(self) -> None:
-        super().__init__(convert_charrefs=True)
-        self.parts: list[str] = []
-        self.skip = 0
+    def address(found: re.Match[str]) -> str:
+        key = next((k for k in KEYS if found[0].startswith(k)), "")
+        local = found[0][len(key) : -1]
+        return f"{key}{'xxx' if local else ''}@"
 
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag in ("script", "style", "head"):
-            self.skip += 1
-        elif tag in BLOCK_TAGS:
-            self.parts.append("\n")
-        elif tag == "img":
-            alt = dict(attrs).get("alt")
-            self.parts.append(f" [img alt={alt!r}] " if alt else " [img] ")
-
-    def handle_endtag(self, tag: str) -> None:
-        if tag in ("script", "style", "head"):
-            self.skip = max(0, self.skip - 1)
-        elif tag in ("td", "th"):
-            self.parts.append(" | ")
-        elif tag in BLOCK_TAGS:
-            self.parts.append("\n")
-
-    def handle_data(self, data: str) -> None:
-        if not self.skip:
-            self.parts.append(data)
-
-    def lines(self) -> list[str]:
-        text = "".join(self.parts).replace("\xa0", " ")
-        out = [" ".join(line.split()).strip(" |") for line in text.splitlines()]
-        return [line for line in out if line]
-
-
-def html_lines(html: str) -> list[str]:
-    parser = HtmlText()
-    parser.feed(html)
-    parser.close()
-    return parser.lines()
+    return re.sub(r"[0-9]", "9", re.sub(r"[\w.%+=-]+@", address, text))
 
 
 def describe(message: EmailMessage) -> list[str]:
     out = ["--- sender ---"]
-    for name in SENDER_HEADERS:
+    for name in SENDER_HEADERS + SYSTEM_HEADERS:
         for value in message.get_all(name, []):
-            out.append(f"{name}: {mask_digits(str(value))}")
+            out.append(f"{name}: {mask_system(str(value)) if name in SYSTEM_HEADERS else value}")
     out.append(f"Subject: {mask_line(str(message.get('Subject', '')))}")
-    out.append(f"Date: {mask_digits(str(message.get('Date', '')))}")
+    out.append(f"Date: {mask_system(str(message.get('Date', '')))}")
     forwarded = "X-Forwarded-To" in message
     out.append(f"forwarded by Gmail filter: {'yes' if forwarded else 'no'}")
 
     out.append("--- authentication (newest first; the receiving server adds these) ---")
     for name in AUTH_HEADERS:
         for value in message.get_all(name, []):
-            out.append(f"{name}: {mask_digits(' '.join(str(value).split()))}")
+            out.append(f"{name}: {mask_system(' '.join(str(value).split()))}")
     for value in message.get_all("DKIM-Signature", []):
         tags = dict(
             tag.strip().split("=", 1) for tag in str(value).split(";") if "=" in tag.strip()
@@ -159,7 +125,9 @@ def describe(message: EmailMessage) -> list[str]:
         if content_type not in ("text/plain", "text/html"):
             continue
         text = str(part.get_content())  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
-        lines = html_lines(text) if content_type == "text/html" else text.splitlines()
+        lines = (
+            html_lines(text, show_images=True) if content_type == "text/html" else text.splitlines()
+        )
         out.append(f"--- {content_type} as text, masked ---")
         out.extend(mask_line(line) for line in lines if line.strip())
     return out

@@ -188,8 +188,19 @@ message either fully handed over or untouched for the next run.
 - Writing templates without seeing real alerts: `uv run python -m tools.email_layout a.eml b.eml`
   (run by the mailbox owner on their own .eml files) prints sender, DKIM/SPF/DMARC results, MIME
   structure and the text with digits as 9 and non-generic words as x/X.
-- `process_email` marks every email `ignored` until the alert templates exist (next step). Logs
-  name the sender's domain only, never addresses, subjects or bodies.
+- `process_email` reads each email with the alert templates (`duit/parsers/alerts/templates/*.yaml`:
+  sender, DKIM domain, institution, direction, subject and body regex with named groups `amount`,
+  optional `last4`, `counterparty`, `date`/`time`). A match becomes a **pending** transaction on the
+  user's one account with that institution (and last 4 digits, if the alert gives them), with an
+  extraction `alert:<template>` and a source link, then the categorisation rules run. Logs name the
+  sender's domain only, never addresses, subjects or bodies.
+- Trust: a template applies only if the **topmost** `Authentication-Results` header, written by our
+  receiving server (`DUIT_ALERTS_AUTHSERV_ID`, default `mx.google.com`), records `dkim=pass` for the
+  template's domain. A sender can add headers of its own, never above the receiving server's.
+- Outcomes: unknown sender -> `ignored`; known sender without its signature -> `failed` (possible
+  spoof); known sender, no template matches, or no matching account -> `failed` with the reason.
+  After adding a template or an account: `kubectl -n duit-staging exec deploy/duit-worker --
+  python -m duit.ingestion.reprocess` (ignored + failed back to received, a job each).
 - Config (`DUIT_IMAP_HOST`, `_PORT` 993, `_USERNAME`, `_PASSWORD`, `_FOLDER` INBOX, `_OWNER` = the
   Duit user's email). Off until host, username, password and owner are set. In Kubernetes they
   come from the optional Secret `duit-imap` (SOPS); restart the worker after changing it.

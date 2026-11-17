@@ -7,8 +7,10 @@ either stored with its job queued and the cursor past it, or none of these, and 
 fetches it again. A message seen twice (the same bytes under another UID, or after the server
 renumbered the folder) is the same document, and is not processed again.
 
-process_email: reads the stored message. Alert templates come next (Week 5 step 4); until then
-every email is marked ignored.
+process_email: reads the stored message with the alert templates (duit.parsers.alerts). An alert
+becomes a pending transaction (duit.ingestion.alerts); an email from a sender we have no template
+for is ignored; a known sender's email that fails DKIM or matches no template is failed, with the
+reason, so it can be looked at and processed again (duit.ingestion.reprocess).
 """
 
 import asyncio
@@ -26,11 +28,21 @@ from sqlalchemy.orm import undefer
 
 from duit.auth.models import User
 from duit.core.settings import ImapConfig, get_settings
+from duit.ingestion.alerts import record_alert
 from duit.ingestion.documents import set_status, store_document
 from duit.ingestion.imap import ImapInbox, Inbox
 from duit.ingestion.models import DocumentSource, DocumentStatus, ImapCursor, RawDocument
 from duit.jobs.app import app, sessionmaker
 from duit.jobs.defer import defer_in_transaction
+from duit.parsers.alerts.engine import (
+    Alert,
+    NoMatch,
+    NoTemplate,
+    Rejected,
+    Template,
+    match,
+    templates,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -95,9 +107,16 @@ async def poll(
     return result
 
 
-async def process_document(db: AsyncSession, document_id: uuid.UUID) -> DocumentStatus | None:
-    """Process one stored email; returns its new status, or None if there was nothing to do
-    (already processed: a job can run twice, e.g. retried after a worker died mid-way)."""
+async def process_document(
+    db: AsyncSession,
+    document_id: uuid.UUID,
+    authserv_id: str = "mx.google.com",
+    catalogue: tuple[Template, ...] | None = None,
+) -> DocumentStatus | None:
+    """Read one stored email with the alert templates; returns its new status, or None if there
+    was nothing to do (already processed: a job can run twice, e.g. retried after a worker died
+    mid-way). Logs name the sender's domain at most: never addresses, subjects or bodies, which
+    may hold names, amounts and account digits."""
     document = await db.scalar(
         select(RawDocument)
         .where(RawDocument.id == document_id)
@@ -106,21 +125,31 @@ async def process_document(db: AsyncSession, document_id: uuid.UUID) -> Document
     )
     if document is None or document.status != DocumentStatus.RECEIVED:
         return None
-    message = BytesParser(policy=email.policy.default).parsebytes(
-        document.content, headersonly=True
-    )
-    # No alert templates yet (Week 5 step 4). Log the sender's domain only: never addresses,
-    # subjects or bodies, which may hold names, amounts and card digits.
-    logger.info("no alert template for email from %s", sender_domain(message.get("From")))
-    await set_status(db, document.id, DocumentStatus.IGNORED)
-    return DocumentStatus.IGNORED
-
-
-def sender_domain(header: object) -> str:
+    message = BytesParser(policy=email.policy.default).parsebytes(document.content)
     try:
-        return header.addresses[0].domain.lower() or "?"  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType, reportUnknownVariableType]
-    except (AttributeError, IndexError):
-        return "?"
+        outcome = match(message, authserv_id, templates() if catalogue is None else catalogue)  # pyright: ignore[reportArgumentType]
+    except ValueError as exc:  # a matched alert with an unreadable amount or date
+        outcome = NoMatch(f"unreadable value ({exc})")
+
+    status, error = DocumentStatus.FAILED, None
+    match outcome:
+        case NoTemplate(sender_domain=domain):
+            logger.info("no alert template for email from %s", domain)
+            status = DocumentStatus.IGNORED
+        case Rejected(reason=reason):
+            logger.warning("rejected email %s: %s", document.id, reason)
+            error = reason
+        case NoMatch(sender=sender):
+            logger.warning("email %s: no template matches (%s)", document.id, sender)
+            error = f"{sender}: no template matches (a new kind of alert, or the layout changed)"
+        case Alert():
+            error = await record_alert(db, document, outcome)
+            if error is None:
+                status = DocumentStatus.PROCESSED
+            else:
+                logger.warning("email %s: %s", document.id, error)
+    await set_status(db, document.id, status, error)
+    return status
 
 
 # --- jobs ------------------------------------------------------------------------------------
@@ -129,7 +158,7 @@ def sender_domain(header: object) -> str:
 @app.task(queue="ingestion", retry=3)
 async def process_email(document_id: str) -> None:
     async with sessionmaker()() as db:
-        await process_document(db, uuid.UUID(document_id))
+        await process_document(db, uuid.UUID(document_id), get_settings().alerts_authserv_id)
         await db.commit()
 
 

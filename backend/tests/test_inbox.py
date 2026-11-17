@@ -225,17 +225,6 @@ async def test_processing_marks_an_email_without_a_template_ignored(
     assert [status for status, _ in await stored(conn)] == ["ignored"]
 
 
-@pytest.mark.parametrize(
-    ("header", "domain"),
-    [("Bank <Alerts@Bank.Example>", "bank.example"), ("not an address", "?"), (None, "?")],
-)
-def test_only_the_sender_domain_is_logged(header: str | None, domain: str) -> None:
-    message = email.message.EmailMessage()
-    if header is not None:
-        message["From"] = header
-    assert inbox.sender_domain(message.get("From")) == domain
-
-
 # --- queueing in our transaction -------------------------------------------------------------
 
 

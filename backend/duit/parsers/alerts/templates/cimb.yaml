@@ -1,0 +1,16 @@
+# CIMB transaction alerts (noreply@notification.cimb.com). Layout learned from a masked copy
+# (tools/email_layout.py); the text below is the alert's wording with values as regex groups.
+# CIMB emails money coming in; spending reaches Duit through the monthly statement.
+# Patterns are single-quoted YAML: backslashes are literal, a quote inside is doubled (You''ve).
+
+- name: cimb-received
+  version: 1
+  sender: noreply@notification.cimb.com
+  dkim: notification.cimb.com
+  institution: CIMB
+  direction: in
+  subject: '^Transaction Notification$'
+  # You've received RM1,234.56 in account ending ******1234 on 17NOV2026 14:03:22.
+  body: 'You''ve received RM(?P<amount>[0-9,]+\.[0-9]{2}) in account ending \*+(?P<last4>[0-9]{4}) on (?P<date>[0-9]{2}[A-Za-z]{3}[0-9]{4}) (?P<time>[0-9]{2}:[0-9]{2}:[0-9]{2})'
+  date_format: '%d%b%Y %H:%M:%S'
+  merchant: CIMB incoming transfer
