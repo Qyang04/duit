@@ -6,7 +6,7 @@ type: Opaque
 stringData:
     DUIT_IMAP_HOST: ENC[AES256_GCM,data:pREZ4u80LlZ50aYruXI=,iv:EBelCwZUwvM7WAIrGgiRJuE3UDMG7QTT5dmQDH2IiZI=,tag:z6OrCXhJpk1Sc4YHLa5P6A==,type:str]
     DUIT_IMAP_USERNAME: ENC[AES256_GCM,data:eLBLonejmChbmlksVScGV9OqGzSwkWg=,iv:JFh1ChtAFUC3Lpib28Tz0DUAcbtZ11vrpiaOYF3e0Ng=,tag:Giqcw6Gz8A6n9Ws2kumT2g==,type:str]
-    DUIT_IMAP_PASSWORD: ENC[AES256_GCM,data:WdgRgNsv+djc3A==,iv:v/TnUEddzRTiXtJjSPhokiOnNIKTUJSz8sz4yOI4+vc=,tag:MDh4P3LkvNQ5DR9msVEEkw==,type:str]
+    DUIT_IMAP_PASSWORD: ENC[AES256_GCM,data:jzYNBKw5sGkcAhsDOK/rjQ==,iv:lWWtcRAxN9G8JT0nNxMzIe+jFRwy7G5pAM1Twk9yJ0g=,tag:T7kbyj4AuyaGTr7gL/4E7w==,type:str]
     DUIT_IMAP_OWNER: ENC[AES256_GCM,data:jGiqlLl8QRqP9vEzXXmDCUSOo4HwO1v9,iv:4N4APhoqkNf9kWAIfVkWmRmiCQOUaYwzi2DFF+d0cVs=,tag:tObVP/CUo2m603Qogs4ldA==,type:str]
 sops:
     age:
@@ -29,6 +29,6 @@ sops:
             -----END AGE ENCRYPTED FILE-----
           recipient: age1ke68pvx8qnk6pj2dfrlwdm4ezqsv27xlhvqrccevv9qhzrjdaqrsug5fth
     encrypted_regex: ^(data|stringData)$
-    lastmodified: "2026-11-17T14:17:33Z"
-    mac: ENC[AES256_GCM,data:27mpa7LecLVLsakhpN5p7r7UWYp4lzTDeaYDoit6luehrd+eiSLMLC2TyfgstBW1ff4tS2zdORieiNdoduGgRBKNyIaMV6TnIz0w8wTBgLou0aof1BJbqqJ+7IUXYsycQ7sk9szg9gPhu6zr4j+oFQFxWBFra2OHStrYdwl6H5I=,iv:LpmayLhWOKwGPTdeQOn8w1YFYZJ7MRXfgkTnB1M1pBk=,tag:qRg4/8LQT75cc78InrpYuQ==,type:str]
+    lastmodified: "2026-11-17T15:19:25Z"
+    mac: ENC[AES256_GCM,data:REK2IBgaXCyLGHsA6nw/kSCo5OX/KpBCJL1kjK307UvJlC1VhpcztWy/mHKSOn1UVTgcSCXCH096Q+U4DZD2ImgexmrXaXS8b9LKYAgdGjwx6mjSnkwqgsoHdBK4nyVASZFCgd6zvuVldyc88SFvaha1n2lB0IP9LyIBngQoxB4=,iv:MFfvsteeyc0EwRoO1dY2906GhVWUb231s5lMue2cYPw=,tag:Kl9ESRC+/SIksto6lSVZDw==,type:str]
     version: 3.13.3
