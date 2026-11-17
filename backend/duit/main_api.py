@@ -11,6 +11,7 @@ from duit.auth.router import router as auth_router
 from duit.core.crypto import load_data_key
 from duit.core.db import create_engine
 from duit.core.settings import get_settings
+from duit.ingestion import documents
 from duit.ledger import accounts, categories, rules, statements, transactions
 
 settings = get_settings()
@@ -41,8 +42,8 @@ app = FastAPI(
 # the SameSite=Strict session cookie needs. Health probes stay at the root (kubelet only).
 api = APIRouter(prefix="/api")
 api.include_router(auth_router)
-for ledger in (accounts, categories, transactions, statements, rules):
-    api.include_router(ledger.router)
+for module in (accounts, categories, transactions, statements, rules, documents):
+    api.include_router(module.router)
 app.include_router(api)
 
 

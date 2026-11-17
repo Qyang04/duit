@@ -107,7 +107,7 @@ that KSOPS uses inside Argo CD. Only values (`data`/`stringData`) are encrypted;
 ## Ledger
 
 Tables: `accounts`, `categories` (two levels, seeded with defaults at registration), `transactions`,
-`category_rules`.
+`category_rules`; ingestion: `raw_documents`, `extractions`, `transaction_sources`.
 
 | Endpoint | What |
 |---|---|
@@ -115,6 +115,7 @@ Tables: `accounts`, `categories` (two levels, seeded with defaults at registrati
 | `GET/POST /api/categories`, `PATCH/DELETE /categories/{id}` | Flat list with `parent_id`; rename, move (`parent_id`, `null` = top level), delete |
 | `GET/POST /api/transactions`, `GET/PATCH/DELETE /transactions/{id}` | Filters: `account_id`, `category_id` (a parent includes its children), `uncategorised`, `date_from`, `date_to`, `q`; `limit` + `cursor` |
 | `GET/POST /api/rules`, `PATCH/DELETE /rules/{id}` | Categorisation rules; every change re-applies them and returns `recategorised` |
+| `GET /api/documents`, `GET /documents/{id}/content` | Raw documents (metadata, newest first, `limit` + `before`); the original bytes, always as a download |
 
 - Another user's row is a 404, never a 403, so ids cannot be probed. Request bodies reject unknown
   fields (no mass assignment of `user_id`, `dedupe_key`, ...).
@@ -175,6 +176,10 @@ Tables: `accounts`, `categories` (two levels, seeded with defaults at registrati
 query `bank=cimb`). Preview parses and flags lines already in the ledger, saving nothing; import
 parses the same PDF again on the server and inserts the new lines.
 
+Import keeps the evidence (one transaction): the PDF as received in `raw_documents`, what the parser
+read in `extractions` (`statement:cimb`, `PARSER_VERSION`), and a `transaction_sources` row from every
+transaction on the statement, new or already there, to that extraction. A failed parse stores nothing.
+
 - Parsers (`duit/parsers/statements/`) are pure functions from positioned words to a statement;
   `read_pdf` (pdfplumber) is the only PDF code. CIMB: columns from each page's header row, a
   transaction starts with a date left of the Date header, indented lines are its description.
@@ -187,6 +192,19 @@ parses the same PDF again on the server and inserts the new lines.
 - Local tools (run on your own files, nothing leaves your machine):
   `uv run python tools/statement_layout.py <pdf>` prints a masked layout for writing a parser;
   `uv run python -m tools.parse_statement <pdf>` prints a shareable summary (`--show`: private detail).
+
+## Raw documents and extractions (`duit/ingestion/`)
+
+- `raw_documents`: original bytes in a `bytea` column for now (TOAST keeps them out of the row;
+  the CNPG backups cover them; the ORM column is deferred so lists never load files). Same bytes =
+  same document per user (`UNIQUE (user_id, sha256)`). Status: received, processed, failed, ignored.
+  Moving to object storage later: add a storage key, copy, drop the column.
+- `extractions`: one row per document, parser and parser version (JSONB `fields`), so parsers can
+  be re-run and compared. `transaction_sources` links transactions to extractions (many to many).
+- Deleting an account keeps its documents (`SET NULL (account_id)`); deleting a transaction drops
+  its source links. Composite `(user_id, id)` keys again: no cross-user links, even by a bug.
+- Downloads: `Content-Disposition: attachment` with our own file name, `nosniff`, a sandbox CSP and
+  `no-store`, because documents come from outside and must never render on our origin.
 
 ## Web (`web/`)
 

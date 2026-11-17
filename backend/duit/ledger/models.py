@@ -160,6 +160,7 @@ class Transaction(Base):
 
     __tablename__ = "transactions"
     __table_args__ = (
+        UniqueConstraint("user_id", "id"),  # target of transaction_sources' composite key
         # The account and category must belong to the same user as the transaction.
         # Deleting an account that still has transactions fails (NO ACTION), so ledger rows
         # never vanish by accident. NO ACTION rather than RESTRICT: the check runs at the end

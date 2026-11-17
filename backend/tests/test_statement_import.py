@@ -58,8 +58,15 @@ async def test_import_adds_each_line_once(
     first = await upload(ana, account, "import", pdf)
     again = await upload(ana, account, "import", pdf)
 
-    assert first.json() == {"imported": 4, "skipped_duplicates": 0, "categorised": 0}
-    assert again.json() == {"imported": 0, "skipped_duplicates": 4, "categorised": 0}
+    assert first.json() | {"document_id": None} == {
+        "document_id": None,
+        "imported": 4,
+        "skipped_duplicates": 0,
+        "categorised": 0,
+    }
+    assert again.json()["imported"] == 0
+    assert again.json()["skipped_duplicates"] == 4
+    assert again.json()["document_id"] == first.json()["document_id"]  # the same file, stored once
     rows = await transactions(ana)
     assert len(rows) == 4
     assert sorted(r["amount_sen"] for r in rows) == [-10000, -1250, -800, 500000]

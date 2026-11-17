@@ -9,6 +9,7 @@ import io
 import uuid
 from dataclasses import dataclass
 from datetime import date
+from typing import Any
 
 import pdfplumber
 from pdfminer.pdfdocument import PDFPasswordIncorrect
@@ -53,6 +54,25 @@ class Statement:
     opening_balance_sen: int
     closing_balance_sen: int
     lines: tuple[StatementLine, ...]
+
+
+def statement_fields(statement: Statement) -> dict[str, Any]:
+    """The statement as JSON for extractions.fields (dates as ISO strings)."""
+    return {
+        "opening_balance_sen": statement.opening_balance_sen,
+        "closing_balance_sen": statement.closing_balance_sen,
+        "lines": [
+            {
+                "posted_on": line.posted_on.isoformat(),
+                "description": line.description,
+                "amount_sen": line.amount_sen,
+                "balance_sen": line.balance_sen,
+                "ref": line.ref,
+                "page": line.page,
+            }
+            for line in statement.lines
+        ],
+    }
 
 
 def read_pdf(data: bytes, password: str | None) -> list[list[Word]]:

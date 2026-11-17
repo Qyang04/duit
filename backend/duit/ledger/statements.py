@@ -8,6 +8,10 @@ Import re-parses instead of accepting rows back from the client, so the ledger o
 what the server itself read from the bank's document. Duplicates are skipped by the database
 (ON CONFLICT on the per-account dedupe_key), so importing the same or an overlapping statement
 twice, even concurrently, adds every transaction exactly once.
+
+Import also keeps the evidence: the PDF as received (raw_documents, still password-protected),
+what the parser read (extractions), and a link from every transaction on the statement, new or
+already in the ledger, to that extraction (transaction_sources).
 """
 
 import enum
@@ -26,9 +30,12 @@ from duit.auth.router import CurrentUser
 from duit.core.crypto import decrypt, load_data_key
 from duit.core.deps import AppSettings, Db
 from duit.core.settings import Settings
+from duit.ingestion.documents import link_sources, record_extraction, set_status, store_document
+from duit.ingestion.models import DocumentSource, DocumentStatus
 from duit.ledger.accounts import get_account, secret_aad
 from duit.ledger.models import Account, Transaction
 from duit.ledger.rules import apply_rules
+from duit.parsers.statements import cimb
 from duit.parsers.statements.base import (
     Statement,
     StatementError,
@@ -36,8 +43,8 @@ from duit.parsers.statements.base import (
     Word,
     dedupe_keys,
     read_pdf,
+    statement_fields,
 )
-from duit.parsers.statements.cimb import parse_cimb
 
 router = APIRouter(prefix="/accounts/{account_id}/statements", tags=["statements"])
 
@@ -48,7 +55,8 @@ class Bank(enum.StrEnum):
     CIMB = "cimb"
 
 
-PARSERS: dict[Bank, Callable[[list[list[Word]]], Statement]] = {Bank.CIMB: parse_cimb}
+PARSERS: dict[Bank, Callable[[list[list[Word]]], Statement]] = {Bank.CIMB: cimb.parse_cimb}
+VERSIONS: dict[Bank, str] = {Bank.CIMB: cimb.PARSER_VERSION}
 CURRENCY: dict[Bank, str] = {Bank.CIMB: "MYR"}
 
 PdfFile = Annotated[UploadFile, File(description="The statement PDF")]
@@ -75,6 +83,7 @@ class Preview(BaseModel):
 
 
 class ImportResult(BaseModel):
+    document_id: uuid.UUID  # the stored PDF (GET /documents/{id}/content)
     imported: int
     skipped_duplicates: int
     categorised: int  # of the imported, how many a rule categorised
@@ -93,7 +102,7 @@ def stored_password(account: Account, settings: Settings) -> str | None:
 
 async def parse_upload(
     account: Account, bank: Bank, file: UploadFile, password: str | None, settings: Settings
-) -> tuple[Statement, list[str]]:
+) -> tuple[Statement, list[str], bytes]:
     if account.currency != CURRENCY[bank]:
         raise unprocessable(f"A {bank.value} statement is in {CURRENCY[bank]}")
     data = await file.read(MAX_BYTES + 1)
@@ -116,7 +125,7 @@ async def parse_upload(
         ) from exc
     except StatementError as exc:
         raise unprocessable(str(exc)) from exc  # messages never contain amounts or names
-    return statement, dedupe_keys(account.id, statement.lines)
+    return statement, dedupe_keys(account.id, statement.lines), data
 
 
 async def known_keys(db: Db, account: Account, keys: list[str]) -> set[str]:
@@ -141,7 +150,7 @@ async def preview_statement(
     bank: Bank = Bank.CIMB,
 ) -> Preview:
     account = await get_account(db, user, account_id)
-    statement, keys = await parse_upload(account, bank, file, password, settings)
+    statement, keys, _ = await parse_upload(account, bank, file, password, settings)
     known = await known_keys(db, account, keys)
     lines = [
         PreviewLine(
@@ -174,9 +183,24 @@ async def import_statement(
     bank: Bank = Bank.CIMB,
 ) -> ImportResult:
     account = await get_account(db, user, account_id)
-    statement, keys = await parse_upload(account, bank, file, password, settings)
-    if not statement.lines:
-        return ImportResult(imported=0, skipped_duplicates=0, categorised=0)
+    statement, keys, data = await parse_upload(account, bank, file, password, settings)
+    document_id = await store_document(
+        db,
+        user.id,
+        source=DocumentSource.UPLOAD,
+        content=data,
+        mime_type="application/pdf",
+        filename=file.filename,
+        account_id=account.id,
+    )
+    extraction_id = await record_extraction(
+        db,
+        user.id,
+        document_id,
+        parser=f"statement:{bank.value}",
+        parser_version=VERSIONS[bank],
+        fields=statement_fields(statement),
+    )
     rows = [
         {
             "user_id": user.id,
@@ -189,15 +213,28 @@ async def import_statement(
         }
         for line, key in zip(statement.lines, keys, strict=True)
     ]
-    inserted = await db.scalars(
-        insert(Transaction)
-        .values(rows)
-        .on_conflict_do_nothing(constraint="uq_transactions_account_id_dedupe_key")
-        .returning(Transaction.id)
+    ids: list[uuid.UUID] = []
+    if rows:
+        inserted = await db.scalars(
+            insert(Transaction)
+            .values(rows)
+            .on_conflict_do_nothing(constraint="uq_transactions_account_id_dedupe_key")
+            .returning(Transaction.id)
+        )
+        ids = list(inserted)
+    # Every line's transaction, new or imported before, is backed by this statement.
+    on_statement = await db.scalars(
+        select(Transaction.id).where(
+            Transaction.account_id == account.id, Transaction.dedupe_key.in_(keys)
+        )
     )
-    ids = list(inserted)
+    await link_sources(db, user.id, extraction_id, on_statement)
+    await set_status(db, document_id, DocumentStatus.PROCESSED)
     categorised = await apply_rules(db, user.id, "ids", ids=ids)
     await db.commit()
     return ImportResult(
-        imported=len(ids), skipped_duplicates=len(rows) - len(ids), categorised=categorised
+        document_id=document_id,
+        imported=len(ids),
+        skipped_duplicates=len(rows) - len(ids),
+        categorised=categorised,
     )

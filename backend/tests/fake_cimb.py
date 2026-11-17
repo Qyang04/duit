@@ -111,9 +111,10 @@ def two_page_statement() -> list[list[Word]]:
     return [page1, page2]
 
 
-def make_pdf(password: str | None) -> bytes:
+def make_pdf(password: str | None, title: str = "Statement") -> bytes:
     """A real PDF with the statement's words at their positions (top-left origin, points)."""
     pdf = FPDF(unit="pt", format="A4")
+    pdf.set_title(title)  # a different title = different bytes, same statement
     # 6pt: glyphs narrower than CHAR_WIDTH, so neighbouring words never touch and merge.
     pdf.set_font("Helvetica", size=6)
     if password is not None:

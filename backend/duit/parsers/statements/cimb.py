@@ -32,6 +32,10 @@ from duit.parsers.statements.base import (
     group_lines,
 )
 
+# Recorded with every extraction. Bump it when the same PDF would parse differently, so old and
+# new results stay apart (extractions are unique per document, parser and version).
+PARSER_VERSION = "1"
+
 DATE = re.compile(r"^(\d{2})/(\d{2})/(\d{4})$")
 AMOUNT = re.compile(r"^\d{1,3}(?:,\d{3})*\.\d{2}$")
 AMOUNT_COLUMNS = ("withdrawal", "deposits", "tax", "balance")

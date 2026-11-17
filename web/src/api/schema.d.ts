@@ -219,6 +219,47 @@ export interface paths {
         patch: operations["update_category_api_categories__category_id__patch"];
         trace?: never;
     };
+    "/api/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Documents
+         * @description Newest first. Ids are UUIDv7 (time-ordered), so `before` pages without an offset.
+         */
+        get: operations["list_documents_api_documents_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/{document_id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download Document
+         * @description The original bytes, always as a download. Documents come from outside (emails, uploads):
+         *     served inline on our origin, an HTML or SVG "document" could run script as the user.
+         */
+        get: operations["download_document_api_documents__document_id__content_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/rules": {
         parameters: {
             query?: never;
@@ -477,6 +518,43 @@ export interface components {
             /** Password */
             password: string;
         };
+        /** DocumentOut */
+        DocumentOut: {
+            /** Account Id */
+            account_id: string | null;
+            /** Error */
+            error: string | null;
+            /** Filename */
+            filename: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Mime Type */
+            mime_type: string;
+            /**
+             * Received At
+             * Format: date-time
+             */
+            received_at: string;
+            /** Sha256 */
+            sha256: string;
+            /** Size Bytes */
+            size_bytes: number;
+            source: components["schemas"]["DocumentSource"];
+            status: components["schemas"]["DocumentStatus"];
+        };
+        /**
+         * DocumentSource
+         * @enum {string}
+         */
+        DocumentSource: "upload" | "email" | "telegram";
+        /**
+         * DocumentStatus
+         * @enum {string}
+         */
+        DocumentStatus: "received" | "processed" | "failed" | "ignored";
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -486,6 +564,11 @@ export interface components {
         ImportResult: {
             /** Categorised */
             categorised: number;
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
             /** Imported */
             imported: number;
             /** Skipped Duplicates */
@@ -1301,6 +1384,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CategoryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_documents_api_documents_get: {
+        parameters: {
+            query?: {
+                /** @description Next page: the last id seen */
+                before?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                "__Host-duit_session"?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_document_api_documents__document_id__content_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: {
+                "__Host-duit_session"?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The bytes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": unknown;
                 };
             };
             /** @description Validation Error */
