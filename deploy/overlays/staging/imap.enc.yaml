@@ -1,0 +1,34 @@
+apiVersion: v1
+kind: Secret
+metadata:
+    name: duit-imap
+type: Opaque
+stringData:
+    DUIT_IMAP_HOST: ENC[AES256_GCM,data:pREZ4u80LlZ50aYruXI=,iv:EBelCwZUwvM7WAIrGgiRJuE3UDMG7QTT5dmQDH2IiZI=,tag:z6OrCXhJpk1Sc4YHLa5P6A==,type:str]
+    DUIT_IMAP_USERNAME: ENC[AES256_GCM,data:eLBLonejmChbmlksVScGV9OqGzSwkWg=,iv:JFh1ChtAFUC3Lpib28Tz0DUAcbtZ11vrpiaOYF3e0Ng=,tag:Giqcw6Gz8A6n9Ws2kumT2g==,type:str]
+    DUIT_IMAP_PASSWORD: ENC[AES256_GCM,data:WdgRgNsv+djc3A==,iv:v/TnUEddzRTiXtJjSPhokiOnNIKTUJSz8sz4yOI4+vc=,tag:MDh4P3LkvNQ5DR9msVEEkw==,type:str]
+    DUIT_IMAP_OWNER: ENC[AES256_GCM,data:jGiqlLl8QRqP9vEzXXmDCUSOo4HwO1v9,iv:4N4APhoqkNf9kWAIfVkWmRmiCQOUaYwzi2DFF+d0cVs=,tag:tObVP/CUo2m603Qogs4ldA==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB5UmNHeUt4cW1TQzdvSVZp
+            L09jeGdyc2FRcFJzcHRBc1pSeDVmN1B0M1NNCllRa0Uxa0d3Q3RCeEkrNEdFMEVE
+            N2oram1YcWo5WkxGSDBRTnRnZHdyM0kKLS0tIHhZbHp0c0lvbUpDTDBOL1AxVGo0
+            ZTFlcnFxYkMvMHVMekViV0MxMzMzN2sKFlgD9OH22XBnLMqEOJKqnb2q5+GaD94d
+            kfUVMq1woWQpjJTVwl95cRx0ZSUCpU98ixIer89lQvQ57PazYOdjUw==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age15zl4fcjfekvad02xn6pu9yyxc65hsvzc3chdghngxjczxgmqy52s6yfmtl
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBJS1diWGp2WWJlSkJMTUl0
+            eXZCV1c1UlI1MzlSdVlERGpHQWlHMnpkRHdNCjhCYXhSTlRmMUkzWXZ0VmFYUjdl
+            ZGJJdjJocGQ2R3ZHNXR4ZVdiMTZQdXcKLS0tIEN5a1BoVEQxdGxxc3lzaXZ0dmJI
+            c3RpeVl2dEl3ZlBoaW1TUTlNVkxEVVEK1jhh8W3kbw9GwvUcM6iWLrjxE43Fhqfz
+            bFKzk48sNKzFtWlgrFqzWtfH1optOf6OcJossAGqZIK3eWRYFQ/IBg==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1ke68pvx8qnk6pj2dfrlwdm4ezqsv27xlhvqrccevv9qhzrjdaqrsug5fth
+    encrypted_regex: ^(data|stringData)$
+    lastmodified: "2026-11-17T14:17:33Z"
+    mac: ENC[AES256_GCM,data:27mpa7LecLVLsakhpN5p7r7UWYp4lzTDeaYDoit6luehrd+eiSLMLC2TyfgstBW1ff4tS2zdORieiNdoduGgRBKNyIaMV6TnIz0w8wTBgLou0aof1BJbqqJ+7IUXYsycQ7sk9szg9gPhu6zr4j+oFQFxWBFra2OHStrYdwl6H5I=,iv:LpmayLhWOKwGPTdeQOn8w1YFYZJ7MRXfgkTnB1M1pBk=,tag:qRg4/8LQT75cc78InrpYuQ==,type:str]
+    version: 3.13.3
