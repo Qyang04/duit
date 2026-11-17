@@ -19,7 +19,7 @@ from duit.main_api import app
 @pytest.fixture
 def anyio_backend() -> tuple[str, dict[str, Any]]:
     # psycopg (Procrastinate's driver) cannot use Windows' default Proactor event loop.
-    options = {"loop_factory": asyncio.SelectorEventLoop} if os.name == "nt" else {}
+    options: dict[str, Any] = {"loop_factory": asyncio.SelectorEventLoop} if os.name == "nt" else {}
     return "asyncio", options
 
 
