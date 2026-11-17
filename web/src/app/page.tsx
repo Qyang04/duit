@@ -290,6 +290,7 @@ function Row({
             parent={parent}
             tilt={tilt}
             animate={animateStamp}
+            pencilled={t.category_rule_id != null}
             onClick={onStamp}
           />
         </div>
@@ -302,6 +303,7 @@ function Row({
           parent={parent}
           tilt={tilt}
           animate={animateStamp}
+          pencilled={t.category_rule_id != null}
           onClick={onStamp}
         />
       </div>
@@ -323,20 +325,29 @@ function StampButton({
   parent,
   tilt,
   animate,
+  pencilled,
   onClick,
 }: {
   category?: Category;
   parent?: Category;
   tilt: number;
   animate: boolean;
+  pencilled: boolean; // filled in by a rule, not stamped by you
   onClick: () => void;
 }) {
+  const path = category ? `${parent ? `${parent.name} › ` : ""}${category.name}` : "";
   return (
     <button
       type="button"
       data-stamp
       onClick={onClick}
-      title={category ? `${parent ? `${parent.name} › ` : ""}${category.name}` : "Stamp a category"}
+      title={
+        !category
+          ? "Stamp a category"
+          : pencilled
+            ? `${path} (pencilled in by a rule: stamp to confirm or correct)`
+            : path
+      }
       className="block"
     >
       <AnimatePresence mode="popLayout" initial={false}>
@@ -345,6 +356,7 @@ function StampButton({
           className="stamp"
           data-empty={!category}
           data-income={category?.is_income ?? false}
+          data-pencil={Boolean(category) && pencilled}
           style={{ ["--tilt" as string]: `${tilt}deg` }}
           // A stamp lands: it comes down large and slightly turned, then thuds into place.
           initial={animate ? { scale: 1.9, opacity: 0, rotate: tilt - 9 } : false}

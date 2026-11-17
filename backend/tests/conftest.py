@@ -41,3 +41,32 @@ async def client(conn: AsyncConnection) -> AsyncGenerator[httpx2.AsyncClient]:
         yield http  # https: the session cookie is Secure
     app.dependency_overrides.clear()
     await session.close()
+
+
+# --- signed-in users (ledger tests) ----------------------------------------------------------
+
+PASSWORD = "correct horse battery"
+
+
+async def sign_in(http: httpx2.AsyncClient, email: str) -> None:
+    creds = {"email": email, "password": PASSWORD}
+    assert (await http.post("/api/auth/register", json=creds)).status_code == 201
+    assert (await http.post("/api/auth/login", json=creds)).status_code == 200
+
+
+@pytest.fixture
+async def ana(client: httpx2.AsyncClient) -> httpx2.AsyncClient:
+    app.dependency_overrides[get_settings] = lambda: get_settings().model_copy(
+        update={"registration_open": True}
+    )
+    await sign_in(client, "ana@example.com")
+    return client
+
+
+@pytest.fixture
+async def bob(ana: httpx2.AsyncClient) -> AsyncGenerator[httpx2.AsyncClient]:
+    """A second browser, with its own cookie jar, on the same app and test transaction."""
+    transport = httpx2.ASGITransport(app=app)
+    async with httpx2.AsyncClient(transport=transport, base_url="https://testserver") as http:
+        await sign_in(http, "bob@example.com")
+        yield http

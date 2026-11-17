@@ -15,6 +15,7 @@ from decimal import Decimal
 from sqlalchemy import (
     BigInteger,
     CheckConstraint,
+    Computed,
     Enum,
     ForeignKey,
     ForeignKeyConstraint,
@@ -39,6 +40,16 @@ class AccountType(enum.StrEnum):
     CASH = "cash"
     EPF = "epf"
     INVESTMENT = "investment"
+
+
+class RuleMatch(enum.StrEnum):
+    MERCHANT = "merchant"  # the merchant key equals the pattern (learned from corrections)
+    CONTAINS = "contains"  # the merchant key contains the pattern (written by the user)
+
+
+class RuleSource(enum.StrEnum):
+    USER = "user"
+    LEARNED = "learned"
 
 
 class TransactionStatus(enum.StrEnum):
@@ -112,6 +123,38 @@ class Category(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
+class CategoryRule(Base):
+    """Categorisation rules: "a transaction whose merchant key is / contains PATTERN belongs in
+    CATEGORY". Patterns are merchant keys too (see Transaction.merchant_key), so "Grab*" and
+    "GRAB" are the same rule. Deleting the category deletes its rules."""
+
+    __tablename__ = "category_rules"
+    __table_args__ = (
+        UniqueConstraint("user_id", "id"),
+        UniqueConstraint("user_id", "match_type", "pattern"),  # one category per pattern
+        ForeignKeyConstraint(
+            ["user_id", "category_id"],
+            ["categories.user_id", "categories.id"],
+            ondelete="CASCADE",
+        ),
+        # The database keeps patterns normalised, whoever writes them.
+        CheckConstraint("pattern <> '' AND pattern = merchant_key(pattern)", name="normalised"),
+        # A one- or two-letter "contains" would match almost everything.
+        CheckConstraint("match_type <> 'contains' OR length(pattern) >= 3", name="contains_min"),
+    )
+    __mapper_args__ = {"eager_defaults": True}
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, server_default=text("uuidv7()"))
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    match_type: Mapped[RuleMatch] = mapped_column(text_enum(RuleMatch, "rule_match"))
+    pattern: Mapped[str]
+    category_id: Mapped[uuid.UUID]
+    source: Mapped[RuleSource] = mapped_column(text_enum(RuleSource, "rule_source"))
+    hit_count: Mapped[int] = mapped_column(server_default=text("0"))  # transactions it categorised
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
+
+
 class Transaction(Base):
     """The ledger. amount_sen is signed: negative = money out, positive = money in."""
 
@@ -136,6 +179,20 @@ class Transaction(Base):
         # The transaction list: newest first, per user.
         Index("ix_transactions_user_posted", "user_id", text("posted_on DESC"), text("id DESC")),
         Index("ix_transactions_user_category", "user_id", "category_id"),
+        # Which rule set the category; NULL with a category = the user set it, and rules never
+        # touch it again. Deleting a category deletes its rules: SET NULL (category_rule_id)
+        # here, and the category FK above clears category_id in the same statement.
+        # Checked at commit (DEFERRED): both cascades update the same row, and checked at once,
+        # the category's update would still see the just-deleted rule's id.
+        ForeignKeyConstraint(
+            ["user_id", "category_rule_id"],
+            ["category_rules.user_id", "category_rules.id"],
+            ondelete="SET NULL (category_rule_id)",
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+        # Re-categorising every transaction of one merchant after a correction.
+        Index("ix_transactions_user_merchant_key", "user_id", "merchant_key"),
     )
     # Read server-generated values (updated_at) back with RETURNING on UPDATE too, so responses
     # built after commit never trigger a lazy load.
@@ -152,7 +209,14 @@ class Transaction(Base):
     # Account currency per one unit of `currency`, when they differ (a USD charge on a MYR card).
     fx_rate: Mapped[Decimal | None] = mapped_column(Numeric(18, 8))
     merchant_raw: Mapped[str]  # the description exactly as the source wrote it
+    # merchant_raw normalised by the SQL function merchant_key() (uppercase letters, single
+    # spaces; digits and punctuation dropped): "POS DEBIT / KK SUPER MART / 31/10/2026 2359"
+    # (three lines) -> "POS DEBIT KK SUPER MART". Swipe dates and times vary, the merchant does not.
+    merchant_key: Mapped[str] = mapped_column(
+        Computed("merchant_key(merchant_raw)", persisted=True)  # STORED: indexable
+    )
     category_id: Mapped[uuid.UUID | None]
+    category_rule_id: Mapped[uuid.UUID | None]
     status: Mapped[TransactionStatus] = mapped_column(
         text_enum(TransactionStatus, "transaction_status"), server_default="confirmed"
     )

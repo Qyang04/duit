@@ -177,6 +177,17 @@ body {
   opacity: 0.75;
 }
 
+/* Pencilled in by a rule: graphite, single line, no ink. Stamping it (same or another
+   category) inks it for good. */
+.stamp[data-pencil="true"] {
+  border: 1.25px solid currentColor;
+  color: var(--ink-2);
+  font-weight: 600;
+  letter-spacing: 0.11em;
+  mask-image: none;
+  opacity: 0.78;
+}
+
 button:hover > .stamp,
 button:focus-visible > .stamp {
   opacity: 1;

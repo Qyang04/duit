@@ -28,6 +28,7 @@ from duit.core.deps import AppSettings, Db
 from duit.core.settings import Settings
 from duit.ledger.accounts import get_account, secret_aad
 from duit.ledger.models import Account, Transaction
+from duit.ledger.rules import apply_rules
 from duit.parsers.statements.base import (
     Statement,
     StatementError,
@@ -76,6 +77,7 @@ class Preview(BaseModel):
 class ImportResult(BaseModel):
     imported: int
     skipped_duplicates: int
+    categorised: int  # of the imported, how many a rule categorised
 
 
 def unprocessable(detail: str) -> HTTPException:
@@ -174,7 +176,7 @@ async def import_statement(
     account = await get_account(db, user, account_id)
     statement, keys = await parse_upload(account, bank, file, password, settings)
     if not statement.lines:
-        return ImportResult(imported=0, skipped_duplicates=0)
+        return ImportResult(imported=0, skipped_duplicates=0, categorised=0)
     rows = [
         {
             "user_id": user.id,
@@ -193,6 +195,9 @@ async def import_statement(
         .on_conflict_do_nothing(constraint="uq_transactions_account_id_dedupe_key")
         .returning(Transaction.id)
     )
-    imported = len(inserted.all())
+    ids = list(inserted)
+    categorised = await apply_rules(db, user.id, "ids", ids=ids)
     await db.commit()
-    return ImportResult(imported=imported, skipped_duplicates=len(rows) - imported)
+    return ImportResult(
+        imported=len(ids), skipped_duplicates=len(rows) - len(ids), categorised=categorised
+    )

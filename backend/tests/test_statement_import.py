@@ -1,34 +1,15 @@
 """Statement import end to end: upload a (fake) password-protected CIMB PDF, preview, import."""
 
-from collections.abc import AsyncGenerator
 from typing import Any
 
 import httpx2
 import pytest
 
-from duit.core.settings import get_settings
-from duit.main_api import app
 from tests.fake_cimb import make_pdf
 
 pytestmark = pytest.mark.anyio
 
 PDF_PASSWORD = "J@123456"
-PASSWORD = "correct horse battery"
-
-
-async def sign_in(http: httpx2.AsyncClient, email: str) -> None:
-    creds = {"email": email, "password": PASSWORD}
-    assert (await http.post("/api/auth/register", json=creds)).status_code == 201
-    assert (await http.post("/api/auth/login", json=creds)).status_code == 200
-
-
-@pytest.fixture
-async def ana(client: httpx2.AsyncClient) -> httpx2.AsyncClient:
-    app.dependency_overrides[get_settings] = lambda: get_settings().model_copy(
-        update={"registration_open": True}
-    )
-    await sign_in(client, "ana@example.com")
-    return client
 
 
 @pytest.fixture
@@ -77,8 +58,8 @@ async def test_import_adds_each_line_once(
     first = await upload(ana, account, "import", pdf)
     again = await upload(ana, account, "import", pdf)
 
-    assert first.json() == {"imported": 4, "skipped_duplicates": 0}
-    assert again.json() == {"imported": 0, "skipped_duplicates": 4}
+    assert first.json() == {"imported": 4, "skipped_duplicates": 0, "categorised": 0}
+    assert again.json() == {"imported": 0, "skipped_duplicates": 4, "categorised": 0}
     rows = await transactions(ana)
     assert len(rows) == 4
     assert sorted(r["amount_sen"] for r in rows) == [-10000, -1250, -800, 500000]
@@ -115,14 +96,6 @@ async def test_too_large(ana: httpx2.AsyncClient, account: str) -> None:
 async def test_account_currency_must_match(ana: httpx2.AsyncClient, pdf: bytes) -> None:
     usd = await ana.post("/api/accounts", json={"type": "bank", "name": "USD", "currency": "USD"})
     assert (await upload(ana, usd.json()["id"], "preview", pdf)).status_code == 422
-
-
-@pytest.fixture
-async def bob(ana: httpx2.AsyncClient) -> AsyncGenerator[httpx2.AsyncClient]:
-    transport = httpx2.ASGITransport(app=app)
-    async with httpx2.AsyncClient(transport=transport, base_url="https://testserver") as http:
-        await sign_in(http, "bob@example.com")
-        yield http
 
 
 async def test_cannot_import_into_another_users_account(

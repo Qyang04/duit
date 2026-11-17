@@ -219,6 +219,42 @@ export interface paths {
         patch: operations["update_category_api_categories__category_id__patch"];
         trace?: never;
     };
+    "/api/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Rules */
+        get: operations["list_rules_api_rules_get"];
+        put?: never;
+        /** Create Rule */
+        post: operations["create_rule_api_rules_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/rules/{rule_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Rule */
+        delete: operations["delete_rule_api_rules__rule_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Rule */
+        patch: operations["update_rule_api_rules__rule_id__patch"];
+        trace?: never;
+    };
     "/api/transactions": {
         parameters: {
             query?: never;
@@ -448,6 +484,8 @@ export interface components {
         };
         /** ImportResult */
         ImportResult: {
+            /** Categorised */
+            categorised: number;
             /** Imported */
             imported: number;
             /** Skipped Duplicates */
@@ -493,6 +531,74 @@ export interface components {
              * Format: date
              */
             posted_on: string;
+        };
+        /** RuleChange */
+        RuleChange: {
+            /** Recategorised */
+            recategorised: number;
+            rule: components["schemas"]["RuleOut"] | null;
+        };
+        /** RuleIn */
+        RuleIn: {
+            /**
+             * Category Id
+             * Format: uuid
+             */
+            category_id: string;
+            /** @default contains */
+            match_type: components["schemas"]["RuleMatch"];
+            /**
+             * Pattern
+             * @example GRAB
+             */
+            pattern: string;
+        };
+        /**
+         * RuleMatch
+         * @enum {string}
+         */
+        RuleMatch: "merchant" | "contains";
+        /** RuleOut */
+        RuleOut: {
+            /**
+             * Category Id
+             * Format: uuid
+             */
+            category_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Hit Count */
+            hit_count: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            match_type: components["schemas"]["RuleMatch"];
+            /** Pattern */
+            pattern: string;
+            source: components["schemas"]["RuleSource"];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * RuleSource
+         * @enum {string}
+         */
+        RuleSource: "user" | "learned";
+        /** RuleUpdate */
+        RuleUpdate: {
+            /** Category Id */
+            category_id?: string | null;
+            match_type?: components["schemas"]["RuleMatch"] | null;
+            /** Pattern */
+            pattern?: string | null;
         };
         /** TotpCode */
         TotpCode: {
@@ -545,6 +651,8 @@ export interface components {
             amount_sen: number;
             /** Category Id */
             category_id: string | null;
+            /** Category Rule Id */
+            category_rule_id: string | null;
             /**
              * Created At
              * Format: date-time
@@ -1193,6 +1301,142 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CategoryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_rules_api_rules_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                "__Host-duit_session"?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_rule_api_rules_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                "__Host-duit_session"?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RuleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleChange"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_rule_api_rules__rule_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: string;
+            };
+            cookie?: {
+                "__Host-duit_session"?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleChange"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_rule_api_rules__rule_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: string;
+            };
+            cookie?: {
+                "__Host-duit_session"?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RuleUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleChange"];
                 };
             };
             /** @description Validation Error */

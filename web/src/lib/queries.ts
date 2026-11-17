@@ -101,7 +101,10 @@ export function useSetCategory() {
               ...data,
               pages: data.pages.map((page) => ({
                 ...page,
-                items: page.items.map((t) => (t.id === id ? { ...t, category_id: categoryId } : t)),
+                // Set by hand now, so no longer a rule's (pencilled) category.
+                items: page.items.map((t) =>
+                  t.id === id ? { ...t, category_id: categoryId, category_rule_id: null } : t,
+                ),
               })),
             }
           : data,
@@ -111,7 +114,8 @@ export function useSetCategory() {
     onError: (_error, _vars, context) => {
       context?.previous.forEach(([key, data]) => qc.setQueryData(key, data));
     },
-    // Filtered views (e.g. "uncategorised") refresh in the background afterwards.
-    onSettled: () => qc.invalidateQueries({ queryKey: ["transactions"], refetchType: "inactive" }),
+    // A stamp teaches a rule that can fill in other rows of the same merchant, so every list
+    // (including the one on screen) refreshes afterwards.
+    onSettled: () => qc.invalidateQueries({ queryKey: ["transactions"] }),
   });
 }

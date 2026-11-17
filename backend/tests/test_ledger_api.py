@@ -2,7 +2,6 @@
 prove that neither can read, change or reference the other's data."""
 
 import uuid
-from collections.abc import AsyncGenerator
 from decimal import Decimal
 from typing import Any
 
@@ -15,35 +14,8 @@ from duit.core.crypto import decrypt, load_data_key
 from duit.core.settings import get_settings
 from duit.ledger.accounts import secret_aad
 from duit.ledger.models import Account
-from duit.main_api import app
 
 pytestmark = pytest.mark.anyio
-
-PASSWORD = "correct horse battery"
-
-
-async def sign_in(http: httpx2.AsyncClient, email: str) -> None:
-    creds = {"email": email, "password": PASSWORD}
-    assert (await http.post("/api/auth/register", json=creds)).status_code == 201
-    assert (await http.post("/api/auth/login", json=creds)).status_code == 200
-
-
-@pytest.fixture
-async def ana(client: httpx2.AsyncClient) -> httpx2.AsyncClient:
-    app.dependency_overrides[get_settings] = lambda: get_settings().model_copy(
-        update={"registration_open": True}
-    )
-    await sign_in(client, "ana@example.com")
-    return client
-
-
-@pytest.fixture
-async def bob(ana: httpx2.AsyncClient) -> AsyncGenerator[httpx2.AsyncClient]:
-    """A second browser, with its own cookie jar, on the same app and test transaction."""
-    transport = httpx2.ASGITransport(app=app)
-    async with httpx2.AsyncClient(transport=transport, base_url="https://testserver") as http:
-        await sign_in(http, "bob@example.com")
-        yield http
 
 
 async def new_account(http: httpx2.AsyncClient, **extra: Any) -> dict[str, Any]:

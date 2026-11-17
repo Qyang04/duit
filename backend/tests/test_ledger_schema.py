@@ -7,13 +7,13 @@ from datetime import date
 from typing import Any
 
 import pytest
-from sqlalchemy import delete, func, insert, select
+from sqlalchemy import delete, func, insert, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 
 from duit.auth.models import User
 from duit.ledger.defaults import DEFAULT_CATEGORIES, seed_default_categories
-from duit.ledger.models import Account, Category, Transaction
+from duit.ledger.models import Account, Category, CategoryRule, Transaction
 
 pytestmark = pytest.mark.anyio
 
@@ -216,3 +216,57 @@ async def test_default_categories_are_seeded_as_a_two_level_tree(
         select(Category.is_income).where(Category.user_id == ana, Category.name == "Salary")
     )
     assert salary_is_income is True
+
+
+# --- categorisation rules --------------------------------------------------------------------
+
+
+async def add_rule(
+    conn: AsyncConnection, user_id: uuid.UUID, category_id: uuid.UUID, pattern: str, **extra: Any
+) -> uuid.UUID:
+    values: dict[str, Any] = {
+        "user_id": user_id,
+        "category_id": category_id,
+        "pattern": pattern,
+        "match_type": "contains",
+        "source": "user",
+        **extra,
+    }
+    return (
+        await conn.execute(insert(CategoryRule).values(values).returning(CategoryRule.id))
+    ).scalar_one()
+
+
+@pytest.mark.parametrize("pattern", ["grab", "GRAB*", " GRAB", "GRAB  FOOD", "", "GR"])
+async def test_rule_patterns_are_stored_normalised(
+    conn: AsyncConnection, ana: uuid.UUID, pattern: str
+) -> None:
+    food = await add_category(conn, ana, "Food")
+    with pytest.raises(IntegrityError, match="ck_category_rules_(normalised|contains_min)"):
+        await add_rule(conn, ana, food, pattern)
+
+
+async def test_merchant_key_is_computed_by_the_database(
+    conn: AsyncConnection, ana: uuid.UUID
+) -> None:
+    account = await add_account(conn, ana)
+    raw = "POS DEBIT\nKK MART\n01/11 2359"
+    txn = await add_transaction(conn, ana, account, merchant_raw=raw)
+    key = await conn.scalar(select(Transaction.merchant_key).where(Transaction.id == txn))
+    assert key == "POS DEBIT KK MART"
+
+
+async def test_rules_cannot_cross_users(
+    conn: AsyncConnection, ana: uuid.UUID, bob: uuid.UUID
+) -> None:
+    ana_food = await add_category(conn, ana, "Food")
+    with pytest.raises(IntegrityError, match="fk_category_rules_user_id_category_id"):
+        async with conn.begin_nested():  # Bob's rule, Ana's category
+            await add_rule(conn, bob, ana_food, "MAMAK")
+
+    rule = await add_rule(conn, ana, ana_food, "MAMAK")
+    bob_account = await add_account(conn, bob)
+    # Bob's transaction, Ana's rule. The FK is checked at commit (deferred): force it now.
+    with pytest.raises(IntegrityError, match="fk_transactions_user_id_category_rule_id"):
+        await add_transaction(conn, bob, bob_account, category_rule_id=rule)
+        await conn.execute(text("SET CONSTRAINTS ALL IMMEDIATE"))

@@ -32,6 +32,15 @@ Checks (CI runs the same):
 uv run ruff check . ; uv run ruff format --check . ; uv run pyright ; uv run deptry . ; uv run alembic check ; uv run pytest
 ```
 
+Tests expect an empty database (registration is first-account-only). If your dev database has an
+account, run them against a separate one:
+
+```powershell
+docker exec duit-postgres-1 psql -U duit -c "CREATE DATABASE duit_test"
+$env:DUIT_DATABASE_URL = "postgresql+asyncpg://duit:duit@127.0.0.1:5432/duit_test"
+uv run alembic upgrade head ; uv run pytest
+```
+
 ## Deploy
 
 `deploy/` is Kustomize: `base/` (CNPG Postgres, migrate Job, API, web) plus one overlay per environment.
@@ -96,13 +105,15 @@ that KSOPS uses inside Argo CD. Only values (`data`/`stringData`) are encrypted;
 
 ## Ledger
 
-Tables: `accounts`, `categories` (two levels, seeded with defaults at registration), `transactions`.
+Tables: `accounts`, `categories` (two levels, seeded with defaults at registration), `transactions`,
+`category_rules`.
 
 | Endpoint | What |
 |---|---|
 | `GET/POST /api/accounts`, `GET/PATCH/DELETE /accounts/{id}` | Accounts; `account_number` and `statement_password` are write-only (only `account_last4` and `has_*` flags come back) |
 | `GET/POST /api/categories`, `PATCH/DELETE /categories/{id}` | Flat list with `parent_id`; rename, move (`parent_id`, `null` = top level), delete |
 | `GET/POST /api/transactions`, `GET/PATCH/DELETE /transactions/{id}` | Filters: `account_id`, `category_id` (a parent includes its children), `uncategorised`, `date_from`, `date_to`, `q`; `limit` + `cursor` |
+| `GET/POST /api/rules`, `PATCH/DELETE /rules/{id}` | Categorisation rules; every change re-applies them and returns `recategorised` |
 
 - Another user's row is a 404, never a 403, so ids cannot be probed. Request bodies reject unknown
   fields (no mass assignment of `user_id`, `dedupe_key`, ...).
@@ -122,6 +133,21 @@ Tables: `accounts`, `categories` (two levels, seeded with defaults at registrati
   transactions (`ON DELETE SET NULL (category_id)`); deleting a user removes the whole ledger.
 - `dedupe_key` is unique per account, so re-importing a statement line is a no-op.
 - Account numbers and statement passwords are AES-GCM encrypted with `DUIT_DATA_KEY`.
+
+## Categorisation rules (corrections become rules)
+
+- `transactions.merchant_key` is a stored generated column, `merchant_key(merchant_raw)`: a SQL
+  function that uppercases and keeps only letters, so `POS DEBIT / KK SUPER MART / 31/10/2026 2359`
+  and next week's swipe both become `POS DEBIT KK SUPER MART`.
+- Rules (`category_rules`): `merchant` = key equals the pattern (learned), `contains` = key
+  contains it (written by you, at least 3 letters). Patterns are normalised the same way; a CHECK
+  constraint enforces it. The most specific rule wins: exact merchant, then the longest contains.
+- Setting a category by hand (PATCH, or POST with `category_id`) upserts a learned merchant rule
+  (latest correction wins) and re-stamps that merchant's other rule-managed rows.
+- `category_rule_id` records which rule set a category; NULL with a category means you set it,
+  and rules never touch it again. Import, manual create and every rule change apply rules in one
+  SQL statement (`duit/ledger/rules.py`); each rule counts its hits.
+- Web: rule-set categories show as a pencilled (graphite) stamp; stamping inks it.
 
 ## Statement import
 

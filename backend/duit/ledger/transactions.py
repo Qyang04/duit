@@ -23,6 +23,7 @@ from duit.ledger.accounts import find_account
 from duit.ledger.categories import find_category
 from duit.ledger.common import Currency, Input, Patch, not_found, unknown
 from duit.ledger.models import Category, Transaction, TransactionStatus
+from duit.ledger.rules import apply_rules, learn
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
@@ -65,6 +66,8 @@ class TransactionOut(BaseModel):
     fx_rate: Decimal | None
     merchant_raw: str
     category_id: uuid.UUID | None
+    # The rule that set category_id; null with a category = set by the user.
+    category_rule_id: uuid.UUID | None
     status: TransactionStatus
     created_at: datetime
     updated_at: datetime
@@ -80,6 +83,7 @@ class TransactionOut(BaseModel):
             fx_rate=t.fx_rate,
             merchant_raw=t.merchant_raw,
             category_id=t.category_id,
+            category_rule_id=t.category_rule_id,
             status=t.status,
             created_at=t.created_at,
             updated_at=t.updated_at,
@@ -201,7 +205,13 @@ async def create_transaction(body: TransactionIn, user: CurrentUser, db: Db) -> 
     fields["currency"] = await check_references(db, user, fields)
     txn = Transaction(user_id=user.id, **fields)
     db.add(txn)
+    await db.flush()
+    if txn.category_id is None:
+        await apply_rules(db, user.id, "ids", ids=[txn.id])
+    else:
+        await learn(db, user.id, txn.id)
     await db.commit()
+    await db.refresh(txn)  # rules changed it in SQL
     return TransactionOut.of(txn)
 
 
@@ -218,9 +228,18 @@ async def update_transaction(
     changes: dict[str, Any] = body.changes()
     merged = {name: changes.get(name, getattr(txn, name)) for name in CHECKED}
     changes["currency"] = await check_references(db, user, merged)
+    by_hand = "category_id" in changes  # a correction (or confirmation) by the user
+    if by_hand:
+        changes["category_rule_id"] = None  # rules never touch it again
     for name, value in changes.items():
         setattr(txn, name, value)
+    await db.flush()
+    if by_hand:
+        await learn(db, user.id, txn.id)
+    elif "merchant_raw" in changes:  # a new merchant key: another rule may fit now
+        await apply_rules(db, user.id, "ids", ids=[txn.id])
     await db.commit()
+    await db.refresh(txn)
     return TransactionOut.of(txn)
 
 
