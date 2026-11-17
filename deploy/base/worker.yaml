@@ -1,0 +1,56 @@
+# The background job worker (Procrastinate): same image as the API, different command.
+# Rolls out with the API, after the migrate Job has brought the queue's tables up to date.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: duit-worker
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  # Two workers for a moment during a rollout is fine: each job is fetched by exactly one
+  # (SELECT ... FOR UPDATE SKIP LOCKED), and periodic runs are queued once per schedule.
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: duit-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: duit-worker
+    spec:
+      automountServiceAccountToken: false
+      # SIGTERM -> the worker stops fetching and gives running jobs 25 s (shutdown_graceful_timeout
+      # in duit/jobs/app.py) to finish, inside this grace period. An aborted job can be retried.
+      terminationGracePeriodSeconds: 35
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: worker
+          image: ghcr.io/qyang04/duit-api
+          # python -m (not the procrastinate script): puts /app on sys.path so duit imports.
+          command: ["python", "-m", "procrastinate", "--app=duit.jobs.app.app", "worker"]
+          envFrom:
+            - configMapRef: { name: duit-config }
+          env:
+            - name: DUIT_DATABASE_URL
+              valueFrom:
+                secretKeyRef: { name: duit-db-app, key: uri }
+            - name: WORKER_NAME # shown in procrastinate_workers and the job logs
+              valueFrom:
+                fieldRef: { fieldPath: metadata.name }
+          # No probes, on purpose. The worker serves no HTTP, and a liveness check that tests
+          # the database would restart a healthy worker during a database outage (it reconnects
+          # by itself). If the process dies, the container exits and Kubernetes restarts it.
+          # A worker that is up but stuck is caught by its heartbeat, which observability will
+          # alert on (procrastinate_workers.last_heartbeat).
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 10m, memory: 96Mi }
+            limits: { memory: 192Mi }

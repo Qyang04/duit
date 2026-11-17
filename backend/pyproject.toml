@@ -17,6 +17,7 @@ dependencies = [
     "pdfplumber>=0.11.10",
     "pdfminer-six>=20260107",
     "python-multipart>=0.0.33",
+    "procrastinate>=3.11.0",
 ]
 
 [dependency-groups]
@@ -24,6 +25,7 @@ dev = [
     "deptry>=0.25.1",
     "fpdf2>=2.9.0",
     "httpx2>=2.16.0",
+    "psycopg[binary]>=3.3.9",
     "pyright>=1.1.414",
     "pytest>=9.2.0",
     "ruff>=0.17.5",

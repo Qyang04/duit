@@ -1,5 +1,5 @@
 # Shared by every environment. Rollout order (Argo CD sync waves):
-#   -1 Postgres (CNPG Cluster, waits until healthy) -> 0 migrate Job -> 1 API, web (+ Ingress)
+#   -1 Postgres (CNPG Cluster, waits until healthy) -> 0 migrate Job -> 1 API, worker, web (+ Ingress)
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 labels:
@@ -10,4 +10,5 @@ resources:
   - backup.yaml
   - migrate-job.yaml
   - api.yaml
+  - worker.yaml
   - web.yaml

@@ -17,7 +17,7 @@ import secrets
 from datetime import UTC, datetime, timedelta
 
 from fastapi import Response
-from sqlalchemy import delete, select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from duit.auth.models import User, UserSession
@@ -72,6 +72,18 @@ async def lookup(db: AsyncSession, token: str) -> tuple[UserSession, User] | Non
 async def end_session(db: AsyncSession, token: str) -> None:
     await db.execute(delete(UserSession).where(UserSession.token_hash == hash_token(token)))
     await db.commit()
+
+
+async def purge_expired(db: AsyncSession, now: datetime | None = None) -> int:
+    """Delete every session past its absolute or idle timeout (the periodic job calls this).
+    Returns how many were deleted."""
+    now = now or datetime.now(UTC)
+    purged = await db.scalars(
+        delete(UserSession)
+        .where(or_(UserSession.expires_at <= now, UserSession.last_seen_at <= now - IDLE_TIMEOUT))
+        .returning(UserSession.id)
+    )
+    return len(purged.all())
 
 
 def set_cookie(response: Response, token: str) -> None:

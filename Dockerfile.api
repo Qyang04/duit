@@ -18,8 +18,16 @@ FROM python:3.13-slim AS runtime
 # - Debian security fixes published since the base image was built (it is rebuilt only every few weeks).
 # - No pip at runtime: nothing installs packages in production, and pip's vendored libraries
 #   (urllib3, msgpack, ...) would otherwise be scanned and patched with every pip CVE.
+# - libpq5 for psycopg (Procrastinate's driver): Debian's libpq, patched by the upgrade above
+#   and visible to Trivy, rather than the copy bundled inside the psycopg-binary wheel.
 # - Fixed non-root UID so Kubernetes can enforce runAsNonRoot / Pod Security "restricted".
-RUN apt-get update     && apt-get upgrade -y --no-install-recommends     && rm -rf /var/lib/apt/lists/*     && python -m pip uninstall -y pip     && rm -rf /usr/local/lib/python3.13/ensurepip     && useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin duit
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && apt-get install -y --no-install-recommends libpq5 \
+    && rm -rf /var/lib/apt/lists/* \
+    && python -m pip uninstall -y pip \
+    && rm -rf /usr/local/lib/python3.13/ensurepip \
+    && useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin duit
 WORKDIR /app
 COPY --from=builder /app/.venv ./.venv
 COPY --from=builder /app/duit ./duit

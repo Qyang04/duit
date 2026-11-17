@@ -18,11 +18,18 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
+def include_name(name: str | None, type_: str, parent_names: object) -> bool:
+    """Autogenerate ignores Procrastinate's tables (and with them their indexes): they come from
+    its own SQL (see the procrastinate migration), not from our models."""
+    return not (type_ == "table" and name is not None and name.startswith("procrastinate_"))
+
+
 def do_run_migrations(connection: Connection) -> None:
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
         compare_server_default=True,
+        include_name=include_name,
     )
     with context.begin_transaction():
         context.run_migrations()

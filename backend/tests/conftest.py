@@ -1,7 +1,10 @@
 """Tests run against a real, migrated Postgres (compose.yaml locally, a service container in CI).
 Each database test runs inside a transaction that is rolled back, so tests leave no data."""
 
+import asyncio
+import os
 from collections.abc import AsyncGenerator
+from typing import Any
 
 import httpx2
 import pytest
@@ -14,8 +17,10 @@ from duit.main_api import app
 
 
 @pytest.fixture
-def anyio_backend() -> str:
-    return "asyncio"
+def anyio_backend() -> tuple[str, dict[str, Any]]:
+    # psycopg (Procrastinate's driver) cannot use Windows' default Proactor event loop.
+    options = {"loop_factory": asyncio.SelectorEventLoop} if os.name == "nt" else {}
+    return "asyncio", options
 
 
 @pytest.fixture

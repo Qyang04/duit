@@ -21,6 +21,7 @@ copy .env.example .env                       # local DUIT_DATABASE_URL (gitignor
 uv sync                                      # create .venv from uv.lock
 uv run alembic upgrade head                  # apply migrations
 uv run uvicorn duit.main_api:app --reload    # http://127.0.0.1:8000/healthz, /readyz, /docs
+uv run python -m procrastinate --app=duit.jobs.app.app worker   # background jobs (optional)
 ```
 
 New migration after changing a model in `duit/`: `uv run alembic revision --autogenerate -m "what changed"`,
@@ -148,6 +149,25 @@ Tables: `accounts`, `categories` (two levels, seeded with defaults at registrati
   and rules never touch it again. Import, manual create and every rule change apply rules in one
   SQL statement (`duit/ledger/rules.py`); each rule counts its hits.
 - Web: rule-set categories show as a pencilled (graphite) stamp; stamping inks it.
+
+## Background jobs (Procrastinate)
+
+- The queue lives in Postgres (`procrastinate_*` tables in `public`): no Redis, and the CNPG
+  backups cover queued jobs. The worker (`deploy/base/worker.yaml`) is the API image running
+  `python -m procrastinate --app=duit.jobs.app.app worker` (`python -m`, so `/app` is importable).
+- Schema: Alembic migration `d2db981322c5` runs a copy of Procrastinate 3.11.0's `schema.sql`
+  (`backend/migrations/sql/procrastinate/`), never the installed package's, so it replays
+  identically. `env.py` hides the tables from autogenerate. Upgrading Procrastinate: copy its new
+  `sql/migrations/*.sql` files and run them from a new Alembic migration;
+  `tests/test_jobs.py` fails until you do.
+- Driver: Procrastinate needs psycopg. The image uses Debian's `libpq5` (patched by `apt-get
+  upgrade`, seen by Trivy); `psycopg[binary]` is a dev-only dependency for Windows and CI.
+  CI's smoke test checks the image's psycopg loads it.
+- Jobs (`duit/jobs/maintenance.py`, queue `maintenance`): purge expired login sessions (hourly
+  at :23), prune job history (daily 03:41 UTC: successes after 7 days, failures after 30).
+- Queue names: at most 40 characters (Postgres NOTIFY channels are 63 bytes, and Procrastinate
+  prefixes 23).
+- Inspect: `uv run python -m procrastinate --app=duit.jobs.app.app shell` (list jobs, retry).
 
 ## Statement import
 
