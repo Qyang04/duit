@@ -1,0 +1,34 @@
+apiVersion: v1
+kind: Secret
+metadata:
+    name: duit-backup-r2
+    annotations:
+        argocd.argoproj.io/sync-wave: "-2"
+type: Opaque
+stringData:
+    ACCESS_KEY_ID: ENC[AES256_GCM,data:muKaVmKskSsmHX6dqEg5yQB2gk9Iwys7VyemWLctfuU=,iv:5/ww5TxRvrNYLkNCdrCDjEB8+GNXwetiX+YshG1Eu2s=,tag:yK1+TG6MNZMo1Nvcth+UPg==,type:str]
+    ACCESS_SECRET_KEY: ENC[AES256_GCM,data:STv7jExUvdVbDR6MMCVQIxmO+LRod56SHkAbr/vP6Coy1Ws1m9nVP6RiMB0JtWTbY3TuAieCYJJg0I5bRf0Png==,iv:YyuxORomoTCDKinq188moaumBfP9jtNSr47D3qVbuF0=,tag:4gYV49a7PshQhfH4DRUI+A==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB0SU0wLzExandjZHA4OFlM
+            WjFYSCtOeVRCQit3MUFDM0FCOEcrNTcyMzFBClFONlFVRWpDa01VMHk2bVg4eDBM
+            cjg3cm1yZlNRdzdQVE5sbmpyYkJxcTQKLS0tIGl5WHc2Tk1HbWVWRkNaTmxGcnhX
+            V3E5RlZWT1J3aDNQaTUxUktTdTNxTE0K+rIP4TrnqeHWW09kihijl8H7b0dkIYc3
+            sehlVHSeyC0cPwvJF2L6rUABwwYObSu0LZeM/efhmml4YVITrdcXGw==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age15zl4fcjfekvad02xn6pu9yyxc65hsvzc3chdghngxjczxgmqy52s6yfmtl
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAxOVI5UkR3Y0tSdmgvZHlW
+            OXp2a3JwdFVTL0x3NjJtemhWUlpERm56WmdvCmdhTDIxN0QyVVBwRTUrUUZ4Zm9y
+            RzNaMEJzbGxXWndVQWdRamVIWklwdGMKLS0tIHAzaGZHT0tCMHVpSEphVW8xY3A3
+            N2FXUEszZFV0c0Q0RlVxTDR1Y3o4aW8K/+t2m9fVaTIKn43rP4YFawqyJ8FmBT5P
+            DQLi1r1oNFXk05ey/giAna0krD9t2/5HOQbr/BD0d3Ed2iH2eDWMlg==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1ke68pvx8qnk6pj2dfrlwdm4ezqsv27xlhvqrccevv9qhzrjdaqrsug5fth
+    encrypted_regex: ^(data|stringData)$
+    lastmodified: "2026-11-17T03:42:18Z"
+    mac: ENC[AES256_GCM,data:+FOWwyQUP0jgoy5zlumYpV6EBNOk8HyZLl1y0JRNhUPpaeOVUd1MNQYVAtILUyFK4nneVEayjEMTVhmchrZZkHuiMDEKLRSh3aJzXp6VrgpcnwsqTp1kRt7Dq5xPd0zn5At42ES450FF9TpOfhPRPKdMMUeAAjZXa1bH+2WjsAo=,iv:VobNnBZW7TFpF+ZZUg9rFclVzC89DIlo+RKfT68R43U=,tag:ZC1OSon+67IqfWsXu9pIcw==,type:str]
+    version: 3.13.3

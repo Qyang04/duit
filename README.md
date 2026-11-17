@@ -39,6 +39,9 @@ Argo CD (configured in [homelab](https://github.com/Qyang04/homelab), `clusters/
 syncs `deploy/overlays/staging` to https://duit-staging.luiqiuyang.com in sync waves:
 
 1. Postgres (`Cluster duit-db`), wait until healthy. CNPG writes credentials to Secret `duit-db-app`.
+   Backups: the CNPG Barman Cloud plugin archives WAL continuously to Cloudflare R2
+   (`ObjectStore duit-backups`, `s3://homelab-backups/duit-staging/`), plus a nightly base backup
+   (`ScheduledBackup duit-db-nightly`, 03:00 UTC); 14-day retention. R2 key: `backup-r2.enc.yaml` (SOPS).
 2. `duit-migrate` Job: `alembic upgrade head`. If it fails, the sync stops and the old API keeps serving.
 3. API and web Deployments and Services; one Ingress: `/api` to the API, everything else to the web app.
    `/healthz` and `/readyz` are not routed publicly (only the kubelet probes them).

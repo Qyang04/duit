@@ -17,6 +17,13 @@ spec:
   postgresql:
     parameters:
       shared_buffers: 64MB
+  # Continuous backup: the Barman Cloud plugin archives every WAL segment to the overlay's
+  # ObjectStore duit-backups (base backups: backup.yaml). Restore drill: docs/runbooks.
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: duit-backups
   storage:
     size: 2Gi
   resources:

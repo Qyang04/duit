@@ -7,6 +7,7 @@ labels:
       app.kubernetes.io/part-of: duit
 resources:
   - postgres.yaml
+  - backup.yaml
   - migrate-job.yaml
   - api.yaml
   - web.yaml

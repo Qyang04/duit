@@ -1,0 +1,31 @@
+# Where staging's Postgres backups go: Cloudflare R2 bucket homelab-backups (homelab/terraform/r2.tf),
+# under duit-staging/. The plugin adds the server name, so files land in duit-staging/duit-db/.
+#
+# Encryption: R2 encrypts every object at rest (AES-256) and the upload is TLS. barman's
+# `encryption: AES256` option is not set: it asks for S3 SSE headers that R2 does not implement.
+# The sensitive columns (account numbers, statement passwords, TOTP secrets) are AES-GCM encrypted
+# by the app, and DUIT_DATA_KEY is not in the backup, so the bucket alone does not reveal them.
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: duit-backups
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2" # before the Cluster that archives into it
+spec:
+  configuration:
+    destinationPath: s3://homelab-backups/duit-staging
+    endpointURL: https://361201798b493df5f2731afcfbe1e188.r2.cloudflarestorage.com
+    s3Credentials: # R2 API token scoped to homelab-backups, Object Read & Write
+      accessKeyId: { name: duit-backup-r2, key: ACCESS_KEY_ID }
+      secretAccessKey: { name: duit-backup-r2, key: ACCESS_SECRET_KEY }
+    wal:
+      compression: zstd # WAL is mostly zeros and repeated pages: compresses ~5-10x
+    data:
+      compression: gzip
+  # Keep enough base backups + WAL to restore to any point in the last 14 days.
+  retentionPolicy: "14d"
+  # The sidecar runs inside the Postgres pod (barman-cloud-wal-archive, barman-cloud-backup).
+  instanceSidecarConfiguration:
+    resources:
+      requests: { cpu: 10m, memory: 64Mi }
+      limits: { memory: 256Mi }
