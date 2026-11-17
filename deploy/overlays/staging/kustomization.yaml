@@ -17,6 +17,6 @@ configMapGenerator: # hash-suffixed name: a config change rolls the pods
         argocd.argoproj.io/sync-wave: "-1" # exists before the migrate Job reads it
 images:
   - name: ghcr.io/qyang04/duit-api
-    newTag: sha-83ff1f5 # immutable tag from CI (one per commit)
+    newTag: sha-33cd017 # immutable tag from CI (one per commit)
   - name: ghcr.io/qyang04/duit-web
-    newTag: sha-83ff1f5 # CI sets both images to the same commit
+    newTag: sha-33cd017 # CI sets both images to the same commit
