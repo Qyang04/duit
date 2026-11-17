@@ -184,7 +184,7 @@ async def import_statement(
 ) -> ImportResult:
     account = await get_account(db, user, account_id)
     statement, keys, data = await parse_upload(account, bank, file, password, settings)
-    document_id = await store_document(
+    document_id, _ = await store_document(
         db,
         user.id,
         source=DocumentSource.UPLOAD,

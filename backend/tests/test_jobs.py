@@ -32,13 +32,14 @@ def test_every_procrastinate_migration_is_in_our_migrations() -> None:
     assert newer == [], f"Procrastinate was upgraded: migrate the database with {newer}"
 
 
-def test_the_maintenance_jobs_are_scheduled() -> None:
+def test_the_periodic_jobs_are_scheduled() -> None:
     app.perform_import_paths()
     periodic: list[Any] = list(app.periodic_registry.periodic_tasks.values())  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
     scheduled = {p.task.name: p.cron for p in periodic}
     assert scheduled == {
         "duit.jobs.maintenance.purge_expired_sessions": "23 * * * *",
         "duit.jobs.maintenance.prune_job_history": "41 3 * * *",
+        "duit.ingestion.inbox.poll_inbox": "* * * * *",
     }
 
 

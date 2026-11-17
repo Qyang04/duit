@@ -17,6 +17,7 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
+    BigInteger,
     CheckConstraint,
     ForeignKey,
     ForeignKeyConstraint,
@@ -128,3 +129,17 @@ class TransactionSource(Base):
     transaction_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
     extraction_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+
+
+class ImapCursor(Base):
+    """How far the poller has read a mailbox: every message with a UID up to last_uid is stored
+    (or was skipped on purpose). UIDs only mean something together with uidvalidity; when the
+    server changes it, reading starts over, and documents already stored are recognised by their
+    sha256. Moved forward in the same transaction as each stored message."""
+
+    __tablename__ = "imap_cursors"
+
+    mailbox: Mapped[str] = mapped_column(primary_key=True)  # ImapConfig.key
+    uidvalidity: Mapped[int] = mapped_column(BigInteger)  # IMAP: unsigned 32-bit
+    last_uid: Mapped[int] = mapped_column(BigInteger)
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())

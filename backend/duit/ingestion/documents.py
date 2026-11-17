@@ -39,8 +39,9 @@ async def store_document(
     mime_type: str,
     filename: str | None = None,
     account_id: uuid.UUID | None = None,
-) -> uuid.UUID:
-    """Store the bytes unless this user already has them; either way, return the document id."""
+) -> tuple[uuid.UUID, bool]:
+    """Store the bytes unless this user already has them. Returns the document id and whether
+    it is new (only a new document needs processing)."""
     sha256 = hashlib.sha256(content).digest()
     inserted = await db.scalar(
         insert(RawDocument)
@@ -58,16 +59,13 @@ async def store_document(
         .returning(RawDocument.id)
     )
     if inserted is not None:
-        return inserted
+        return inserted, True
     # Already stored. A concurrent insert of the same bytes made ON CONFLICT wait for it to
     # commit, so this read finds the row.
-    return (
-        await db.scalars(
-            select(RawDocument.id).where(
-                RawDocument.user_id == user_id, RawDocument.sha256 == sha256
-            )
-        )
-    ).one()
+    existing = await db.scalars(
+        select(RawDocument.id).where(RawDocument.user_id == user_id, RawDocument.sha256 == sha256)
+    )
+    return existing.one(), False
 
 
 async def record_extraction(

@@ -35,6 +35,10 @@ spec:
           command: ["python", "-m", "procrastinate", "--app=duit.jobs.app.app", "worker"]
           envFrom:
             - configMapRef: { name: duit-config }
+            # The alert mailbox (DUIT_IMAP_HOST, _USERNAME, _PASSWORD, _OWNER), SOPS-encrypted
+            # per environment. Optional: without it the poll job does nothing. Env is read at
+            # start, so after changing it: kubectl -n <ns> rollout restart deploy/duit-worker
+            - secretRef: { name: duit-imap, optional: true }
           env:
             - name: DUIT_DATABASE_URL
               valueFrom:

@@ -28,7 +28,7 @@ app = App(
         min_size=2,  # the LISTEN connection + one for fetching and finishing jobs
         max_size=4,
     ),
-    import_paths=["duit.jobs.maintenance"],
+    import_paths=["duit.jobs.maintenance", "duit.ingestion.inbox"],
     worker_defaults={
         "concurrency": 2,  # parallel jobs per worker; our jobs mostly wait on I/O
         # On SIGTERM (a rollout, a node drain) running jobs get this long to finish before

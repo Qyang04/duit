@@ -169,6 +169,27 @@ Tables: `accounts`, `categories` (two levels, seeded with defaults at registrati
 - Queue names: at most 40 characters (Postgres NOTIFY channels are 63 bytes, and Procrastinate
   prefixes 23).
 - Inspect: `uv run python -m procrastinate --app=duit.jobs.app.app shell` (list jobs, retry).
+- Queueing a job together with our own writes: `duit/jobs/defer.py` (`defer_in_transaction`)
+  inserts the job through our SQLAlchemy session, so it commits or rolls back with the data it is
+  about. Procrastinate's own `defer_async()` uses its own connection, i.e. a separate transaction.
+
+## Alert emails (IMAP)
+
+A dedicated mailbox receives bank and e-wallet alerts. `poll_inbox` (queue `ingestion`, every
+minute, never two at once) reads new messages over IMAPS and, per message in one transaction,
+stores it as a `raw_documents` row (`source=email`, `message/rfc822`), queues its `process_email`
+job and moves the cursor (`imap_cursors`: UIDVALIDITY + last UID). A crash at any point leaves a
+message either fully handed over or untouched for the next run.
+
+- Read-only: the folder is opened with EXAMINE and bodies fetched with `BODY.PEEK[]`; Duit never
+  marks, moves or deletes mail. Certificates are verified, TLS 1.2+, 30 s socket timeout.
+- 50 messages per run (a full mailbox drains over a few minutes); messages over 5 MiB are skipped
+  and logged by UID. The same bytes twice are one document (sha256 per user) and one job.
+- `process_email` marks every email `ignored` until the alert templates exist (next step). Logs
+  name the sender's domain only, never addresses, subjects or bodies.
+- Config (`DUIT_IMAP_HOST`, `_PORT` 993, `_USERNAME`, `_PASSWORD`, `_FOLDER` INBOX, `_OWNER` = the
+  Duit user's email). Off until host, username, password and owner are set. In Kubernetes they
+  come from the optional Secret `duit-imap` (SOPS); restart the worker after changing it.
 
 ## Statement import
 
