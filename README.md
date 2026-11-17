@@ -185,6 +185,9 @@ message either fully handed over or untouched for the next run.
   marks, moves or deletes mail. Certificates are verified, TLS 1.2+, 30 s socket timeout.
 - 50 messages per run (a full mailbox drains over a few minutes); messages over 5 MiB are skipped
   and logged by UID. The same bytes twice are one document (sha256 per user) and one job.
+- Writing templates without seeing real alerts: `uv run python -m tools.email_layout a.eml b.eml`
+  (run by the mailbox owner on their own .eml files) prints sender, DKIM/SPF/DMARC results, MIME
+  structure and the text with digits as 9 and non-generic words as x/X.
 - `process_email` marks every email `ignored` until the alert templates exist (next step). Logs
   name the sender's domain only, never addresses, subjects or bodies.
 - Config (`DUIT_IMAP_HOST`, `_PORT` 993, `_USERNAME`, `_PASSWORD`, `_FOLDER` INBOX, `_OWNER` = the
