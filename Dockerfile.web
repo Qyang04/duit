@@ -11,7 +11,7 @@ RUN npm ci --no-audit --no-fund
 COPY web/ ./
 RUN npm run build && node scripts/csp.mjs out > security-headers.conf
 
-FROM nginxinc/nginx-unprivileged:1.30.6-alpine3.24 AS runtime
+FROM nginxinc/nginx-unprivileged:1.31.7-alpine3.24 AS runtime
 USER root
 # Alpine security fixes published since the base image was built.
 RUN apk upgrade --no-cache
